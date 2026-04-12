@@ -2,7 +2,16 @@ import streamlit as st
 import uuid
 import json
 import os
+import sys
 import webbrowser
+
+# --- Path Fix for Monorepo ---
+# Add the project root to sys.path so 'core' can be found
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from pypdf import PdfReader
 import google.generativeai as genai
 from core.security import SecurityManager

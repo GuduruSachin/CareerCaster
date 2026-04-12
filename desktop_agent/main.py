@@ -5,6 +5,14 @@ import urllib.parse
 import ctypes
 import threading
 import time
+
+# --- Path Fix for Monorepo ---
+# Add the project root to sys.path so 'core' can be found
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 import google.generativeai as genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFrame, QSystemTrayIcon, QMenu, QScrollArea)
