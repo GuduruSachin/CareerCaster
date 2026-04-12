@@ -8,6 +8,7 @@ import urllib.parse
 import ctypes
 import threading
 import time
+import io
 
 # --- Path Fix for Monorepo ---
 # Add the project root to sys.path so 'core' can be found
@@ -15,6 +16,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = PROJECT_ROOT
+
+    return os.path.join(base_path, relative_path)
 
 from google import genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -26,6 +37,7 @@ from PyQt6.QtGui import QColor, QIcon, QAction, QFont, QPainter, QPixmap
 from core.audio_processor import AudioProcessor
 from core.security import SecurityManager
 from core.paths import get_sessions_dir
+from core.logger import log_api_transaction
 
 # --- Windows API Constants ---
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
@@ -34,15 +46,23 @@ class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
     status_update = pyqtSignal(str, str) # status_text, color
 
-    def __init__(self, api_key, context_tags, active_model=None):
+    def __init__(self, api_key, context_tags, active_model=None, preview_mode=False):
         super().__init__()
         self.api_key = api_key
         self.context_tags = context_tags
+        self.preview_mode = preview_mode
         # Use gemini-3.1-flash-lite-preview as requested for instant results
         self.active_model = {"name": "gemini-3.1-flash-lite-preview", "sdk": "New (google-genai)", "version": "v1beta"}
         self.is_running = True
         self.is_muted = False
-        self.processor = AudioProcessor()
+        
+        # VAD Parameters
+        self.THRESHOLD = 0.02 # RMS Sensitivity (tweakable)
+        self.SILENCE_LIMIT_MS = 800 # Trigger after 800ms of silence
+        self.MIN_SPEECH_MS = 200 # Ignore very short noises
+        
+        # 30ms frames for VAD precision
+        self.processor = AudioProcessor(chunk_size=480) 
         self.stream = None
         
         # Initialize new google-genai client forcing v1beta endpoint
@@ -61,46 +81,89 @@ class AudioCaptureThread(QThread):
         
         p = self.processor.pa
         try:
+            # Re-calculate chunk size for 30ms based on detected rate
+            frame_duration_ms = 30
+            chunk_size = int(self.processor.rate * (frame_duration_ms / 1000.0))
+            
             self.stream = p.open(
                 format=self.processor.format,
                 channels=self.processor.channels,
                 rate=self.processor.rate,
                 input=True,
                 input_device_index=device_index,
-                frames_per_buffer=self.processor.chunk_size
+                frames_per_buffer=chunk_size
             )
         except Exception as e:
             print(f"Stream Open Error: {e}")
             self.status_update.emit("● AUDIO ERROR", "#FF5555")
             return
 
-        audio_buffer = []
-        # 4 seconds of audio
-        buffers_per_chunk = int((self.processor.rate * 4) / self.processor.chunk_size)
+        speech_buffer = io.BytesIO()
+        silence_counter_ms = 0
+        speech_counter_ms = 0
+        is_recording = False
 
         try:
             while self.is_running:
                 try:
                     if self.stream and self.stream.is_active():
-                        data = self.stream.read(self.processor.chunk_size, exception_on_overflow=False)
+                        data = self.stream.read(chunk_size, exception_on_overflow=False)
                     else:
                         break
                 except Exception:
                     continue
                 
                 if not self.is_muted:
-                    audio_buffer.append(data)
+                    rms = self.processor.calculate_rms(data)
                     
-                    if len(audio_buffer) >= buffers_per_chunk:
-                        raw_pcm = b"".join(audio_buffer)
-                        overlap_buffers = int(self.processor.rate / self.processor.chunk_size)
-                        audio_buffer = audio_buffer[-overlap_buffers:]
+                    if rms > self.THRESHOLD:
+                        # Speech detected
+                        if not is_recording:
+                            is_recording = True
+                            print("VAD: Speech Started")
                         
-                        self.process_audio_chunk(raw_pcm)
+                        speech_buffer.write(data)
+                        speech_counter_ms += frame_duration_ms
+                        silence_counter_ms = 0 # Reset silence
+                    else:
+                        # Silence detected
+                        if is_recording:
+                            speech_buffer.write(data) # Keep some silence for context
+                            silence_counter_ms += frame_duration_ms
+                            
+                            # Trigger processing if silence exceeds limit
+                            if silence_counter_ms >= self.SILENCE_LIMIT_MS:
+                                if speech_counter_ms >= self.MIN_SPEECH_MS:
+                                    print(f"VAD: Triggering AI after {speech_counter_ms}ms speech")
+                                    self.status_update.emit("● THINKING...", "#FFAA00")
+                                    
+                                    # Get full audio and process
+                                    full_audio = speech_buffer.getvalue()
+                                    self.process_audio_chunk(full_audio)
+                                    
+                                    self.status_update.emit("● LISTENING", "#00FF00")
+                                
+                                # Reset for next question
+                                speech_buffer.close()
+                                speech_buffer = io.BytesIO()
+                                silence_counter_ms = 0
+                                speech_counter_ms = 0
+                                is_recording = False
+                        else:
+                            # Still idle
+                            pass
                 else:
-                    audio_buffer = []
+                    # Muted: Clear everything
+                    if is_recording:
+                        speech_buffer.close()
+                        speech_buffer = io.BytesIO()
+                        silence_counter_ms = 0
+                        speech_counter_ms = 0
+                        is_recording = False
                     time.sleep(0.1)
         finally:
+            if speech_buffer:
+                speech_buffer.close()
             if self.stream:
                 try:
                     self.stream.stop_stream()
@@ -113,6 +176,18 @@ class AudioCaptureThread(QThread):
         try:
             prompt = self.processor.get_ai_prompt(self.context_tags)
             
+            if self.preview_mode:
+                # Preview Mode: No API Cost
+                print("VAD: Preview Mode ON - Skipping API call")
+                self.new_chat_message.emit("interviewer", "[Audio Detected - Preview Mode]")
+                log_api_transaction(
+                    model_used=self.active_model["name"],
+                    prompt_length=len(prompt),
+                    response_text="[PREVIEW_ONLY]",
+                    status="PREVIEW_ONLY"
+                )
+                return
+
             response = self.client.models.generate_content(
                 model=self.active_model["name"],
                 contents=[
@@ -138,11 +213,31 @@ class AudioCaptureThread(QThread):
                         self.new_chat_message.emit("interviewer", q)
                     if a:
                         self.new_chat_message.emit("advisor", a)
+                    
+                    log_api_transaction(
+                        model_used=self.active_model["name"],
+                        prompt_length=len(prompt),
+                        response_text=res_text,
+                        status="SUCCESS"
+                    )
                 except json.JSONDecodeError:
-                    pass
+                    log_api_transaction(
+                        model_used=self.active_model["name"],
+                        prompt_length=len(prompt),
+                        response_text=res_text,
+                        status="PARSE_ERROR"
+                    )
                     
         except Exception as e:
-            print(f"AI Processing Error: {e}")
+            err_msg = str(e)
+            print(f"AI Processing Error: {err_msg}")
+            log_api_transaction(
+                model_used=self.active_model["name"],
+                prompt_length=len(prompt) if 'prompt' in locals() else 0,
+                response_text="",
+                status="ERROR",
+                error_details=err_msg
+            )
 
     def stop(self):
         self.is_running = False
@@ -200,14 +295,23 @@ class StealthOverlay(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
+        # Set Window Icon
+        icon_path = get_resource_path(os.path.join("assets", "logo.ico"))
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         self.container = QFrame(self)
         self.container.setObjectName("MainContainer")
-        self.container.setStyleSheet("""
-            #MainContainer {
+        
+        # Cyan visual cue for Preview Mode
+        border_color = "#00FFFF" if self.data.get("preview_mode") else "#333"
+        
+        self.container.setStyleSheet(f"""
+            #MainContainer {{
                 background-color: rgba(15, 15, 15, 230);
-                border: 1px solid #333;
+                border: 2px solid {border_color};
                 border-radius: 12px;
-            }
+            }}
         """)
         
         self.main_layout = QVBoxLayout(self)
@@ -322,7 +426,8 @@ class StealthOverlay(QWidget):
         self.audio_thread = AudioCaptureThread(
             self.data.get("api_key"),
             self.data.get("context_tags", {}),
-            self.data.get("active_model")
+            self.data.get("active_model"),
+            self.data.get("preview_mode", False)
         )
         self.audio_thread.new_chat_message.connect(self.add_message)
         self.audio_thread.status_update.connect(self.update_status)
@@ -388,8 +493,21 @@ class StealthOverlay(QWidget):
         event.accept()
 
 def main():
+    # Windows Taskbar Branding
+    if sys.platform == "win32":
+        try:
+            myappid = 'careercaster.stealth.agent.v1'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception as e:
+            print(f"Branding Error: {e}")
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+    
+    # Set Application Icon
+    icon_path = get_resource_path(os.path.join("assets", "logo.ico"))
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     
     url_arg = sys.argv[1] if len(sys.argv) > 1 else ""
     parsed_url = urllib.parse.urlparse(url_arg)
@@ -416,7 +534,11 @@ def main():
         overlay.show()
         
         tray_icon = QSystemTrayIcon(app)
-        tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
+        icon_path = get_resource_path(os.path.join("assets", "logo.ico"))
+        if os.path.exists(icon_path):
+            tray_icon.setIcon(QIcon(icon_path))
+        else:
+            tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
         
         tray_menu = QMenu()
         restore_action = QAction("Restore Overlay", tray_menu)

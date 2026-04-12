@@ -3,6 +3,7 @@ import numpy as np
 import wave
 import io
 import base64
+import json
 
 class AudioProcessor:
     def __init__(self, chunk_size=1024):
@@ -88,6 +89,21 @@ class AudioProcessor:
                 wf.setframerate(self.rate)
                 wf.writeframes(pcm_data)
             return wav_buffer.getvalue()
+
+    def calculate_rms(self, pcm_data):
+        """
+        Calculates the Root Mean Square (RMS) energy of PCM data.
+        """
+        if not pcm_data:
+            return 0
+        # Convert bytes to int16 array
+        audio_data = np.frombuffer(pcm_data, dtype=np.int16)
+        if len(audio_data) == 0:
+            return 0
+        # Calculate RMS
+        rms = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
+        # Normalize to 0.0 - 1.0 range (approximate for int16)
+        return rms / 32768.0
 
     def get_ai_prompt(self, context_tags):
         """

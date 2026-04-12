@@ -14,7 +14,7 @@
 - [x] Implement Gemini 3.1 Pro for advanced interview reasoning.
 - [x] Migrate exclusively to `google-genai` SDK and remove legacy SDK.
 
-## Phase 3: Distribution & UX (Completed)
+## Phase 3: Distribution & Deployment (Completed)
 - [x] Implement AES-256 local encryption for session data.
 - [x] Implement Path Normalization for EXE/Script compatibility.
 - [x] Implement a local "Session Manager" (Switcher) in the Agent.
@@ -23,6 +23,9 @@
 - [x] Modernize Overlay UI (Resizable, Control Bar, Transparency).
 - [x] Implement Detached Process Launch for CMD-less operation.
 - [x] Implement Auto-Sample Rate Detection for audio hardware.
+- [x] Icon Integration: Prepare `assets/logo.ico` for the window and taskbar.
+- [x] Resource Bundling: Ensure all `.cc` session files and `logs/` are handled in a temporary user directory.
+- [x] PyInstaller Build: Create the standalone `.exe` configuration.
 - [ ] macOS/Linux support (without Windows-specific stealth API).
 
 ## Phase 4: Live Chat & Voice Focus (Completed)
@@ -31,6 +34,8 @@
 - [x] Implement Graceful Shutdown (Thread joining & resource cleanup).
 - [x] Migrate to Gemini 3.1 Flash-Lite for ultra-low latency.
 - [x] Implement Stealth Answer Logic (Brevity & Bold keywords).
+- [x] Implement API Black Box Recorder (JSONL Logging).
+- [x] Implement Preview Mode (Safety Gatekeeper).
 
 ## Technical Debt
 - [ ] Refactor path resolution to use absolute project root.

@@ -126,6 +126,8 @@ with st.sidebar:
             selected_option = st.selectbox("Active Model", options=model_options, index=0)
             selected_index = model_options.index(selected_option)
             st.session_state.active_model = success_models[selected_index]
+            
+            preview_mode = st.toggle("Preview Mode (No AI Costs)", value=True, help="Skips Gemini API calls in the agent. Useful for testing hardware.")
 
     st.info("The API key is required for real-time hint generation in the local agent.")
 
@@ -215,7 +217,8 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             "session_id": session_id,
             "analysis": analysis,
             "context_tags": context_tags,
-            "active_model": best_model
+            "active_model": best_model,
+            "preview_mode": preview_mode
         }
         
         security = SecurityManager()

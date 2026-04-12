@@ -34,19 +34,18 @@ To ensure the assistant remains invisible during screen-sharing (Zoom/Teams/OBS)
 - **Flag**: `WDA_EXCLUDEFROMCAPTURE (0x00000011)`
 - **Effect**: The window is rendered by the GPU for the local user but is skipped by the Desktop Window Manager (DWM) during capture/composition for external streams.
 
-## Real-Time Audio Pipeline
-1. **Capture**: `PyAudio` captures system output via **Windows WASAPI Loopback**.
-2. **Auto-Detection**: The system automatically detects the best sample rate (16kHz, 44.1kHz, or 48kHz) to ensure hardware compatibility.
-3. **Chunking**: Audio is buffered into 4-second chunks with a 1-second sliding window overlap for context.
-4. **Advanced Reasoning**: 
-    - **Voice Focus**: AI is instructed to ignore the interviewee and focus exclusively on the interviewer's voice.
-    - **Brevity**: AI answers are strictly limited to under 20 words for instant readability.
-    - **Formatting**: Technical keywords are automatically **BOLDED**.
-5. **Processing**: Chunks are processed exclusively using the `google-genai` SDK on the `v1beta` endpoint using the **Gemini 3.1 Flash-Lite** model for ultra-low latency.
-6. **UI Update**: 
-    - **Dual-Bubble Chat**: Interviewer questions (Left/Gray) and AI Advice (Right/Blue) are displayed in a scrollable chat interface.
-    - **Auto-Scroll**: The chat automatically scrolls to the bottom as new messages arrive.
-    - **Graceful Shutdown**: The agent ensures all threads are joined and resources released before exiting.
+## Real-Time Audio Pipeline: VAD State Machine
+CareerCaster uses a high-precision Voice Activity Detection (VAD) state machine to ensure natural, low-latency interactions:
+
+1. **State: IDLE**: The system monitors 30ms audio frames. If RMS energy exceeds a configurable threshold, it transitions to RECORDING.
+2. **State: RECORDING**: Audio frames are accumulated into a `BytesIO` buffer. If silence is detected, a counter begins.
+3. **State: PROCESSING**: If silence persists for >800ms, the buffer is finalized and sent to the Gemini API. The system then returns to IDLE.
+
+## Logging & Safety Layer
+To protect users from unexpected costs and provide diagnostic transparency:
+- **Black Box Recorder**: Every API call is logged to `logs/api_history.jsonl` with timestamps, latency, and status codes.
+- **Preview Mode**: A safety gatekeeper that allows users to verify hardware and VAD triggers without calling the Gemini API.
+- **Quota Tracking**: Explicitly captures 429 (Resource Exhausted) errors to help users manage their Free Tier limits.
 
 ## Data Flow Diagram
 ```text
