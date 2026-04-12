@@ -14,6 +14,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from google import genai
+import google.generativeai as classic_genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFrame, QSystemTrayIcon, QMenu, QScrollArea)
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QTimer
@@ -31,19 +32,26 @@ class AudioCaptureThread(QThread):
     new_hint = pyqtSignal(str)
     status_update = pyqtSignal(str, str) # status_text, color
 
-    def __init__(self, api_key, context_tags):
+    def __init__(self, api_key, context_tags, active_model=None):
         super().__init__()
         self.api_key = api_key
         self.context_tags = context_tags
+        self.active_model = active_model or {"name": "gemini-1.5-flash-latest", "sdk": "New (google-genai)", "version": "v1"}
         self.is_running = True
         self.is_muted = False
         self.processor = AudioProcessor()
         
-        # Initialize new google-genai client forcing v1 stable endpoint
-        self.client = genai.Client(
-            api_key=self.api_key,
-            http_options={'api_version': 'v1'}
-        )
+        # Initialize the correct SDK based on the Sweep Test result
+        if self.active_model["sdk"] == "New (google-genai)":
+            self.client = genai.Client(
+                api_key=self.api_key,
+                http_options={'api_version': self.active_model["version"]}
+            )
+            self.classic_model = None
+        else:
+            classic_genai.configure(api_key=self.api_key, transport='rest')
+            self.classic_model = classic_genai.GenerativeModel(self.active_model["name"])
+            self.client = None
 
     def run(self):
         device_index = self.processor.find_wasapi_loopback_device()
@@ -117,19 +125,29 @@ class AudioCaptureThread(QThread):
             If irrelevant, return an empty string.
             """
             
-            # Using gemini-3-flash-preview with the new SDK pattern
-            response = self.client.models.generate_content(
-                model='gemini-3-flash-preview',
-                contents=[
+            if self.client:
+                # Using New SDK
+                response = self.client.models.generate_content(
+                    model=self.active_model["name"],
+                    contents=[
+                        prompt,
+                        genai.types.Part.from_bytes(
+                            data=self.processor.pcm_to_wav_bytes(raw_pcm),
+                            mime_type='audio/wav'
+                        )
+                    ]
+                )
+                hint = response.text.strip()
+            else:
+                # Using Classic SDK
+                # Note: Classic SDK requires a slightly different format for audio
+                base64_audio = self.processor.pcm_to_base64_wav(raw_pcm)
+                response = self.classic_model.generate_content([
                     prompt,
-                    genai.types.Part.from_bytes(
-                        data=self.processor.pcm_to_wav_bytes(raw_pcm),
-                        mime_type='audio/wav'
-                    )
-                ]
-            )
+                    {'mime_type': 'audio/wav', 'data': base64_audio}
+                ])
+                hint = response.text.strip()
             
-            hint = response.text.strip()
             if hint:
                 self.new_hint.emit(hint)
         except Exception as e:
@@ -265,7 +283,8 @@ class StealthOverlay(QWidget):
             
         self.audio_thread = AudioCaptureThread(
             self.data.get("api_key"),
-            self.data.get("context_tags", {})
+            self.data.get("context_tags", {}),
+            self.data.get("active_model")
         )
         self.audio_thread.new_hint.connect(self.update_live_feed)
         self.audio_thread.status_update.connect(self.update_status)

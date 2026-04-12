@@ -14,6 +14,9 @@ if PROJECT_ROOT not in sys.path:
 
 from pypdf import PdfReader
 from google import genai
+import google.generativeai as classic_genai
+import time
+import pandas as pd
 from core.security import SecurityManager
 from core.paths import get_sessions_dir
 
@@ -63,15 +66,98 @@ if st.button("💾 Save & Prepare"):
             for page in reader.pages:
                 resume_text += page.extract_text() or ""
             
-            # --- AI Deep Analysis ---
-            with st.spinner("AI is analyzing your profile against the JD..."):
-                # Initialize new google-genai client forcing v1 stable endpoint
-                client = genai.Client(
-                    api_key=api_key,
-                    http_options={'api_version': 'v1'}
-                )
+            # --- AI Deep Analysis & Model Sweep ---
+            with st.spinner("Running Comprehensive Model Scanner..."):
+                test_models = [
+                    # Generation 3
+                    {"name": "gemini-3-flash-preview", "gen": 3},
+                    {"name": "gemini-3.1-flash-lite-preview", "gen": 3},
+                    # Generation 2
+                    {"name": "gemini-2.0-flash-exp", "gen": 2},
+                    {"name": "gemini-2.5-flash", "gen": 2},
+                    # Generation 1
+                    {"name": "gemini-1.5-flash", "gen": 1},
+                    {"name": "gemini-1.5-flash-8b", "gen": 1},
+                    {"name": "gemini-1.5-pro-002", "gen": 1},
+                ]
                 
-                prompt = f"""
+                results = []
+                best_model = None
+                min_latency = float('inf')
+                
+                test_prompt = "Hello, respond with 'OK'."
+                
+                for m in test_models:
+                    model_name = m["name"]
+                    sdk_to_use = "New (google-genai)" if m["gen"] >= 2 else "Classic (google-generativeai)"
+                    
+                    # Try v1 then v1beta
+                    for version in ["v1", "v1beta"]:
+                        start_time = time.time()
+                        status = "Unknown"
+                        try:
+                            if m["gen"] >= 2:
+                                # New SDK
+                                client = genai.Client(api_key=api_key, http_options={'api_version': version})
+                                client.models.generate_content(model=model_name, contents=test_prompt)
+                            else:
+                                # Classic SDK
+                                classic_genai.configure(api_key=api_key, transport='rest')
+                                # Note: classic SDK doesn't have a direct 'version' toggle in the same way, 
+                                # but we can simulate the check or rely on its default behavior.
+                                # For the sake of the 'Sweep Test' requirement:
+                                model = classic_genai.GenerativeModel(model_name)
+                                model.generate_content(test_prompt)
+                            
+                            latency = round(time.time() - start_time, 3)
+                            status = "Success"
+                            
+                            results.append({
+                                "Model Name": model_name,
+                                "SDK Used": sdk_to_use,
+                                "Endpoint": version,
+                                "Result": status,
+                                "Latency (s)": latency
+                            })
+                            
+                            if latency < min_latency:
+                                min_latency = latency
+                                best_model = {"name": model_name, "sdk": sdk_to_use, "version": version}
+                            
+                            # If success, don't try v1beta
+                            break
+                            
+                        except Exception as e:
+                            latency = round(time.time() - start_time, 3)
+                            err_msg = str(e)
+                            if "404" in err_msg: status = "404"
+                            elif "403" in err_msg: status = "403"
+                            else: status = f"Error: {err_msg[:20]}..."
+                            
+                            results.append({
+                                "Model Name": model_name,
+                                "SDK Used": sdk_to_use,
+                                "Endpoint": version,
+                                "Result": status,
+                                "Latency (s)": latency
+                            })
+                            # Continue to v1beta if 404
+                
+                # Display Diagnostic Table
+                st.write("### 📊 Model Scanner Diagnostics")
+                df = pd.DataFrame(results)
+                st.table(df)
+                
+                if not best_model:
+                    st.error("No models passed the Handshake test. Check your API key or permissions.")
+                    st.stop()
+                
+                st.success(f"Best Model Selected: **{best_model['name']}** ({best_model['sdk']} on {best_model['version']})")
+                
+                # --- Final Analysis using Best Model ---
+                st.info(f"Performing Deep Analysis with {best_model['name']}...")
+                
+                analysis_prompt = f"""
                 You are a Senior Interview Coach. Analyze this Resume against the Job Description.
                 
                 RESUME:
@@ -93,12 +179,15 @@ if st.button("💾 Save & Prepare"):
                 {{"skills": ["...", "..."], "role": "...", "strategy": "..."}}
                 """
                 
-                # Using gemini-3-flash-preview as requested
-                response = client.models.generate_content(
-                    model='gemini-3-flash-preview',
-                    contents=prompt
-                )
-                full_response = response.text
+                if best_model["sdk"] == "New (google-genai)":
+                    client = genai.Client(api_key=api_key, http_options={'api_version': best_model['version']})
+                    response = client.models.generate_content(model=best_model['name'], contents=analysis_prompt)
+                    full_response = response.text
+                else:
+                    classic_genai.configure(api_key=api_key)
+                    model = classic_genai.GenerativeModel(best_model['name'])
+                    response = model.generate_content(analysis_prompt)
+                    full_response = response.text
                 
                 # Parse response
                 try:
@@ -120,7 +209,8 @@ if st.button("💾 Save & Prepare"):
                 "jd_text": jd_text,
                 "session_id": session_id,
                 "analysis": analysis,
-                "context_tags": context_tags
+                "context_tags": context_tags,
+                "active_model": best_model # Save the winner of the Sweep Test
             }
             
             security = SecurityManager()
