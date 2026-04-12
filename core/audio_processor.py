@@ -5,13 +5,36 @@ import io
 import base64
 
 class AudioProcessor:
-    def __init__(self, rate=16000, chunk_size=1024):
+    def __init__(self, chunk_size=1024):
         self.pa = pyaudio.PyAudio()
-        self.rate = rate
         self.chunk_size = chunk_size
         self.format = pyaudio.paInt16
         self.channels = 1 # Mono for transcription
+        self.rate = self._detect_best_sample_rate()
         
+    def _detect_best_sample_rate(self):
+        """
+        Tests common sample rates and returns the first one compatible with the hardware.
+        """
+        rates = [16000, 44100, 48000]
+        device_index = self.find_wasapi_loopback_device()
+        
+        for rate in rates:
+            try:
+                if self.pa.is_format_supported(
+                    rate=rate,
+                    input_device=device_index,
+                    input_channels=self.channels,
+                    input_format=self.format
+                ):
+                    print(f"Auto-detected compatible sample rate: {rate}Hz")
+                    return rate
+            except Exception:
+                continue
+        
+        print("Warning: No standard sample rate verified. Defaulting to 16000Hz.")
+        return 16000
+
     def find_wasapi_loopback_device(self):
         """
         Finds the WASAPI loopback device index.

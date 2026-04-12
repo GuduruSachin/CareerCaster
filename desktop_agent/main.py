@@ -1,3 +1,6 @@
+#!/usr/bin/env pythonw
+# Note: Save this file as .pyw or run with pythonw.exe to hide the CMD window on Windows.
+
 import sys
 import os
 import json
@@ -14,11 +17,10 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from google import genai
-import google.generativeai as classic_genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QPushButton, QFrame, QSystemTrayIcon, QMenu, QScrollArea)
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QTimer
-from PyQt6.QtGui import QColor, QIcon, QAction
+                             QLabel, QPushButton, QFrame, QSystemTrayIcon, QMenu, QScrollArea, QSizeGrip)
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QTimer, QRect
+from PyQt6.QtGui import QColor, QIcon, QAction, QFont, QPainter, QPixmap
 
 # Import modularized audio logic
 from core.audio_processor import AudioProcessor
@@ -41,17 +43,11 @@ class AudioCaptureThread(QThread):
         self.is_muted = False
         self.processor = AudioProcessor()
         
-        # Initialize the correct SDK based on the Sweep Test result
-        if self.active_model["sdk"] == "New (google-genai)":
-            self.client = genai.Client(
-                api_key=self.api_key,
-                http_options={'api_version': self.active_model["version"]}
-            )
-            self.classic_model = None
-        else:
-            classic_genai.configure(api_key=self.api_key, transport='rest')
-            self.classic_model = classic_genai.GenerativeModel(self.active_model["name"])
-            self.client = None
+        # Initialize new google-genai client forcing v1beta endpoint as requested
+        self.client = genai.Client(
+            api_key=self.api_key,
+            http_options={'api_version': 'v1beta'}
+        )
 
     def run(self):
         device_index = self.processor.find_wasapi_loopback_device()
@@ -125,28 +121,18 @@ class AudioCaptureThread(QThread):
             If irrelevant, return an empty string.
             """
             
-            if self.client:
-                # Using New SDK
-                response = self.client.models.generate_content(
-                    model=self.active_model["name"],
-                    contents=[
-                        prompt,
-                        genai.types.Part.from_bytes(
-                            data=self.processor.pcm_to_wav_bytes(raw_pcm),
-                            mime_type='audio/wav'
-                        )
-                    ]
-                )
-                hint = response.text.strip()
-            else:
-                # Using Classic SDK
-                # Note: Classic SDK requires a slightly different format for audio
-                base64_audio = self.processor.pcm_to_base64_wav(raw_pcm)
-                response = self.classic_model.generate_content([
+            # Using New SDK exclusively
+            response = self.client.models.generate_content(
+                model=self.active_model["name"],
+                contents=[
                     prompt,
-                    {'mime_type': 'audio/wav', 'data': base64_audio}
-                ])
-                hint = response.text.strip()
+                    genai.types.Part.from_bytes(
+                        data=self.processor.pcm_to_wav_bytes(raw_pcm),
+                        mime_type='audio/wav'
+                    )
+                ]
+            )
+            hint = response.text.strip()
             
             if hint:
                 self.new_hint.emit(hint)
@@ -183,99 +169,144 @@ class StealthOverlay(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
+        # Main Container with Rounded Corners and Alpha 0.8
         self.container = QFrame(self)
+        self.container.setObjectName("MainContainer")
         self.container.setStyleSheet("""
-            QFrame {
-                background-color: rgba(20, 20, 20, 225);
+            #MainContainer {
+                background-color: rgba(20, 20, 20, 204); /* Alpha 0.8 (204/255) */
                 border: 1px solid #444;
-                border-radius: 12px;
+                border-radius: 15px;
             }
         """)
         
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.addWidget(self.container)
+
         layout = QVBoxLayout(self.container)
         layout.setContentsMargins(12, 10, 12, 12)
         
-        # Header
+        # Header Bar
         header_layout = QHBoxLayout()
+        
+        # Drag Handle
         self.handle = QLabel("⠿") 
-        self.handle.setStyleSheet("color: #666; font-size: 18px;")
+        self.handle.setStyleSheet("color: #666; font-size: 18px; font-weight: bold;")
         self.handle.setCursor(Qt.CursorShape.SizeAllCursor)
         
+        # Status
         self.status_indicator = QLabel("● INITIALIZING")
-        self.status_indicator.setStyleSheet("color: #FFAA00; font-size: 9px; font-weight: bold; font-family: 'Consolas';")
+        self.status_indicator.setStyleSheet("color: #FFAA00; font-size: 10px; font-weight: bold; font-family: 'Segoe UI', 'Roboto';")
         
-        # Session Switcher Button
-        self.session_btn = QPushButton("📂")
-        self.session_btn.setFixedSize(24, 24)
-        self.session_btn.setStyleSheet("background: transparent; border: none; font-size: 14px;")
-        self.session_btn.setToolTip("Switch Session")
-        self.session_btn.clicked.connect(self.show_session_menu)
+        # Control Buttons
+        self.screenshot_btn = QPushButton("📸")
+        self.screenshot_btn.setFixedSize(28, 28)
+        self.screenshot_btn.setStyleSheet("background: transparent; border: none; font-size: 16px;")
+        self.screenshot_btn.setToolTip("Take Screenshot")
+        self.screenshot_btn.clicked.connect(self.take_screenshot)
 
-        # Mute Toggle
         self.mute_btn = QPushButton("🎤")
-        self.mute_btn.setFixedSize(24, 24)
-        self.mute_btn.setStyleSheet("background: transparent; border: none; font-size: 14px;")
+        self.mute_btn.setFixedSize(28, 28)
+        self.mute_btn.setStyleSheet("background: transparent; border: none; font-size: 16px;")
         self.mute_btn.clicked.connect(self.toggle_mute)
         
-        # Minimize Button
-        self.min_btn = QPushButton("—")
-        self.min_btn.setFixedSize(24, 24)
-        self.min_btn.setStyleSheet("background: transparent; color: #888; font-size: 16px; border: none;")
-        self.min_btn.clicked.connect(self.hide)
-
-        self.close_btn = QPushButton("×")
-        self.close_btn.setFixedSize(24, 24)
-        self.close_btn.setStyleSheet("background: transparent; color: #888; font-size: 18px; border: none;")
-        self.close_btn.clicked.connect(self.close)
+        self.close_btn = QPushButton("❌")
+        self.close_btn.setFixedSize(28, 28)
+        self.close_btn.setStyleSheet("background: transparent; color: #FF5555; font-size: 14px; border: none; font-weight: bold;")
+        self.close_btn.setToolTip("Kill Interview Process")
+        self.close_btn.clicked.connect(self.kill_process)
         
         header_layout.addWidget(self.handle)
-        header_layout.addStretch()
-        header_layout.addWidget(self.session_btn)
-        header_layout.addWidget(self.mute_btn)
+        header_layout.addSpacing(10)
         header_layout.addWidget(self.status_indicator)
-        header_layout.addWidget(self.min_btn)
+        header_layout.addStretch()
+        header_layout.addWidget(self.screenshot_btn)
+        header_layout.addWidget(self.mute_btn)
         header_layout.addWidget(self.close_btn)
         layout.addLayout(header_layout)
         
-        # AI Battle Plan (Static)
+        # AI Battle Plan
         self.plan_label = QLabel("AI BATTLE PLAN")
-        self.plan_label.setStyleSheet("color: #00AAFF; font-size: 9px; font-weight: bold; letter-spacing: 1px;")
+        self.plan_label.setStyleSheet("color: #00AAFF; font-size: 10px; font-weight: bold; letter-spacing: 1px; font-family: 'Segoe UI', 'Roboto';")
         layout.addWidget(self.plan_label)
         
         self.plan_display = QLabel(self.data.get("analysis", "No analysis found."))
         self.plan_display.setWordWrap(True)
-        self.plan_display.setStyleSheet("color: #BBB; font-size: 11px; padding-bottom: 5px;")
+        self.plan_display.setStyleSheet("color: #BBB; font-size: 12px; padding-bottom: 5px; font-family: 'Segoe UI', 'Roboto';")
         
         plan_scroll = QScrollArea()
         plan_scroll.setWidgetResizable(True)
         plan_scroll.setWidget(self.plan_display)
-        plan_scroll.setFixedHeight(60)
+        plan_scroll.setFixedHeight(70)
         plan_scroll.setStyleSheet("background: transparent; border: none;")
         plan_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(plan_scroll)
         
         layout.addWidget(QFrame(frameShape=QFrame.Shape.HLine, styleSheet="background-color: #333;"))
         
-        # Live Feed (Dynamic)
+        # Live Feed
         self.live_label = QLabel("LIVE FEED")
-        self.live_label.setStyleSheet("color: #FF4444; font-size: 9px; font-weight: bold; letter-spacing: 1px;")
+        self.live_label.setStyleSheet("color: #FF4444; font-size: 10px; font-weight: bold; letter-spacing: 1px; font-family: 'Segoe UI', 'Roboto';")
         layout.addWidget(self.live_label)
         
         self.live_display = QLabel("Listening for interview questions...")
         self.live_display.setWordWrap(True)
         self.live_display.setTextFormat(Qt.TextFormat.RichText)
-        self.live_display.setStyleSheet("color: #FFF; font-size: 12px; font-weight: 500;")
+        self.live_display.setStyleSheet("color: #FFF; font-size: 13px; font-weight: 500; font-family: 'Segoe UI', 'Roboto';")
         
         live_scroll = QScrollArea()
         live_scroll.setWidgetResizable(True)
         live_scroll.setWidget(self.live_display)
-        live_scroll.setFixedHeight(140)
         live_scroll.setStyleSheet("background: transparent; border: none;")
         layout.addWidget(live_scroll)
+
+        # Resize Grip
+        self.sizegrip = QSizeGrip(self)
+        self.sizegrip.setFixedSize(16, 16)
+        self.sizegrip.setStyleSheet("background: transparent;")
         
-        self.setFixedSize(340, 360)
+        self.resize(360, 400)
         screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - 360, 50)
+        self.move(screen.width() - 380, 50)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizegrip.move(self.width() - self.sizegrip.width(), self.height() - self.sizegrip.height())
+
+    def take_screenshot(self):
+        """Captures only the overlay window and saves it to /screenshots."""
+        try:
+            screenshots_dir = os.path.join(PROJECT_ROOT, "screenshots")
+            if not os.path.exists(screenshots_dir):
+                os.makedirs(screenshots_dir)
+            
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = f"CareerCaster_{timestamp}.png"
+            filepath = os.path.join(screenshots_dir, filename)
+            
+            # Capture the widget
+            pixmap = self.grab()
+            pixmap.save(filepath, "PNG")
+            
+            self.update_status("● SCREENSHOT SAVED", "#00AAFF")
+            QTimer.singleShot(2000, lambda: self.update_status("● LISTENING", "#00FF00"))
+            print(f"Screenshot saved: {filepath}")
+        except Exception as e:
+            print(f"Screenshot Error: {e}")
+
+    def kill_process(self):
+        """Gracefully kills the interview process and deletes the session file."""
+        try:
+            self.audio_thread.stop()
+            sessions_dir = get_sessions_dir()
+            session_path = os.path.join(sessions_dir, f"{self.session_id}.cc")
+            if os.path.exists(session_path):
+                os.remove(session_path)
+            print(f"Session {self.session_id} cleared.")
+        except Exception as e:
+            print(f"Error killing process: {e}")
+        QApplication.quit()
 
     def start_audio_thread(self):
         if self.audio_thread:
