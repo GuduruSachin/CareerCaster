@@ -45,13 +45,13 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,           # Set to True temporarily if you want to see errors on launch
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/logo.ico',
+    icon=['assets/logo.ico'], # Formatted as a list for better compatibility
 )
 
 coll = COLLECT(
