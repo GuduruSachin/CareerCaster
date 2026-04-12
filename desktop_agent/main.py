@@ -41,7 +41,7 @@ class AudioCaptureThread(QThread):
         
         # Configure Gemini
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
     def run(self):
         device_index = self.processor.find_wasapi_loopback_device()

@@ -66,7 +66,7 @@ if st.button("💾 Save & Prepare"):
             # --- AI Deep Analysis ---
             with st.spinner("AI is analyzing your profile against the JD..."):
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash') # Using flash for speed
+                model = genai.GenerativeModel('gemini-1.5-flash-latest') # Using flash for speed
                 
                 prompt = f"""
                 You are a Senior Interview Coach. Analyze this Resume against the Job Description.
