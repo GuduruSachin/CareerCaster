@@ -10,22 +10,26 @@ import threading
 import time
 import io
 
-# --- Path Fix for Monorepo ---
-# Add the project root to sys.path so 'core' can be found
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
+# --- Path Fix for Monorepo & PyInstaller ---
 def get_resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
+    if hasattr(sys, '_MEIPASS'):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = PROJECT_ROOT
+        return os.path.join(sys._MEIPASS, relative_path)
+    
+    # In development, resources are relative to the project root
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(base_dir, ".."))
+    return os.path.join(project_root, relative_path)
 
-    return os.path.join(base_path, relative_path)
+# Add the correct root to sys.path so 'core' can be found
+if hasattr(sys, '_MEIPASS'):
+    bundle_root = sys._MEIPASS
+else:
+    bundle_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+if bundle_root not in sys.path:
+    sys.path.insert(0, bundle_root)
 
 from google import genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -436,7 +440,7 @@ class StealthOverlay(QWidget):
     def take_screenshot(self):
         """Captures only the overlay window and saves it to /screenshots."""
         try:
-            screenshots_dir = os.path.join(PROJECT_ROOT, "screenshots")
+            screenshots_dir = os.path.join(bundle_root, "screenshots")
             if not os.path.exists(screenshots_dir):
                 os.makedirs(screenshots_dir)
             
