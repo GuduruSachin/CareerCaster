@@ -34,6 +34,79 @@ st.markdown("Prepare your interview session and trigger the local stealth agent.
 with st.sidebar:
     st.header("🔑 Configuration")
     api_key = st.text_input("Gemini API Key", type="password", help="Enter your Google Gemini API Key")
+    
+    if api_key:
+        if "scan_results" not in st.session_state or st.session_state.get("last_key") != api_key:
+            with st.status("Checking connection...", expanded=False) as status:
+                test_models = [
+                    {"name": "gemini-3-flash-preview", "gen": 3},
+                    {"name": "gemini-3.1-flash-lite-preview", "gen": 3},
+                    {"name": "gemini-2.0-flash-exp", "gen": 2},
+                    {"name": "gemini-2.5-flash", "gen": 2},
+                    {"name": "gemini-1.5-flash", "gen": 1},
+                    {"name": "gemini-1.5-flash-8b", "gen": 1},
+                    {"name": "gemini-1.5-pro-002", "gen": 1},
+                ]
+                
+                results = []
+                test_prompt = "Hello, respond with 'OK'."
+                
+                for m in test_models:
+                    model_name = m["name"]
+                    sdk_to_use = "New (google-genai)" if m["gen"] >= 2 else "Classic (google-generativeai)"
+                    
+                    for version in ["v1", "v1beta"]:
+                        start_time = time.time()
+                        try:
+                            if m["gen"] >= 2:
+                                client = genai.Client(api_key=api_key, http_options={'api_version': version})
+                                client.models.generate_content(model=model_name, contents=test_prompt)
+                            else:
+                                classic_genai.configure(api_key=api_key, transport='rest')
+                                model = classic_genai.GenerativeModel(model_name)
+                                model.generate_content(test_prompt)
+                            
+                            latency = round(time.time() - start_time, 3)
+                            results.append({
+                                "name": model_name,
+                                "sdk": sdk_to_use,
+                                "version": version,
+                                "status": "Success",
+                                "latency": latency
+                            })
+                            break
+                        except Exception as e:
+                            err_msg = str(e)
+                            res_status = "404" if "404" in err_msg else ("403" if "403" in err_msg else "Error")
+                            if version == "v1beta" or res_status != "404":
+                                results.append({
+                                    "name": model_name,
+                                    "sdk": sdk_to_use,
+                                    "version": version,
+                                    "status": res_status,
+                                    "latency": round(time.time() - start_time, 3)
+                                })
+                
+                st.session_state.scan_results = results
+                st.session_state.last_key = api_key
+                status.update(label="Connection Verified!", state="complete", expanded=False)
+
+        # Smart Filtered Dropdown
+        success_models = [r for r in st.session_state.scan_results if r["status"] == "Success"]
+        if success_models:
+            # Sort by latency for intelligent default
+            success_models.sort(key=lambda x: x["latency"])
+            model_options = [f"{m['name']} ({m['latency']}s)" for m in success_models]
+            
+            with st.expander("⚙️ Advanced Settings"):
+                selected_option = st.selectbox("Active Model", options=model_options, index=0)
+                # Recover the actual model dict
+                selected_index = model_options.index(selected_option)
+                st.session_state.active_model = success_models[selected_index]
+        else:
+            st.error("No compatible models found. Check API Key.")
+            st.session_state.active_model = None
+
     st.info("The API key is required for real-time hint generation in the local agent.")
 
 # --- Main UI Components ---
@@ -54,6 +127,8 @@ if "saved" not in st.session_state:
 if st.button("💾 Save & Prepare"):
     if not api_key:
         st.error("Please provide a Gemini API Key in the sidebar.")
+    elif not st.session_state.get("active_model"):
+        st.error("No active model selected. Please verify your API Key.")
     elif not resume_file:
         st.error("Please upload a Resume PDF.")
     elif not jd_text:
@@ -66,96 +141,9 @@ if st.button("💾 Save & Prepare"):
             for page in reader.pages:
                 resume_text += page.extract_text() or ""
             
-            # --- AI Deep Analysis & Model Sweep ---
-            with st.spinner("Running Comprehensive Model Scanner..."):
-                test_models = [
-                    # Generation 3
-                    {"name": "gemini-3-flash-preview", "gen": 3},
-                    {"name": "gemini-3.1-flash-lite-preview", "gen": 3},
-                    # Generation 2
-                    {"name": "gemini-2.0-flash-exp", "gen": 2},
-                    {"name": "gemini-2.5-flash", "gen": 2},
-                    # Generation 1
-                    {"name": "gemini-1.5-flash", "gen": 1},
-                    {"name": "gemini-1.5-flash-8b", "gen": 1},
-                    {"name": "gemini-1.5-pro-002", "gen": 1},
-                ]
-                
-                results = []
-                best_model = None
-                min_latency = float('inf')
-                
-                test_prompt = "Hello, respond with 'OK'."
-                
-                for m in test_models:
-                    model_name = m["name"]
-                    sdk_to_use = "New (google-genai)" if m["gen"] >= 2 else "Classic (google-generativeai)"
-                    
-                    # Try v1 then v1beta
-                    for version in ["v1", "v1beta"]:
-                        start_time = time.time()
-                        status = "Unknown"
-                        try:
-                            if m["gen"] >= 2:
-                                # New SDK
-                                client = genai.Client(api_key=api_key, http_options={'api_version': version})
-                                client.models.generate_content(model=model_name, contents=test_prompt)
-                            else:
-                                # Classic SDK
-                                classic_genai.configure(api_key=api_key, transport='rest')
-                                # Note: classic SDK doesn't have a direct 'version' toggle in the same way, 
-                                # but we can simulate the check or rely on its default behavior.
-                                # For the sake of the 'Sweep Test' requirement:
-                                model = classic_genai.GenerativeModel(model_name)
-                                model.generate_content(test_prompt)
-                            
-                            latency = round(time.time() - start_time, 3)
-                            status = "Success"
-                            
-                            results.append({
-                                "Model Name": model_name,
-                                "SDK Used": sdk_to_use,
-                                "Endpoint": version,
-                                "Result": status,
-                                "Latency (s)": latency
-                            })
-                            
-                            if latency < min_latency:
-                                min_latency = latency
-                                best_model = {"name": model_name, "sdk": sdk_to_use, "version": version}
-                            
-                            # If success, don't try v1beta
-                            break
-                            
-                        except Exception as e:
-                            latency = round(time.time() - start_time, 3)
-                            err_msg = str(e)
-                            if "404" in err_msg: status = "404"
-                            elif "403" in err_msg: status = "403"
-                            else: status = f"Error: {err_msg[:20]}..."
-                            
-                            results.append({
-                                "Model Name": model_name,
-                                "SDK Used": sdk_to_use,
-                                "Endpoint": version,
-                                "Result": status,
-                                "Latency (s)": latency
-                            })
-                            # Continue to v1beta if 404
-                
-                # Display Diagnostic Table
-                st.write("### 📊 Model Scanner Diagnostics")
-                df = pd.DataFrame(results)
-                st.table(df)
-                
-                if not best_model:
-                    st.error("No models passed the Handshake test. Check your API key or permissions.")
-                    st.stop()
-                
-                st.success(f"Best Model Selected: **{best_model['name']}** ({best_model['sdk']} on {best_model['version']})")
-                
-                # --- Final Analysis using Best Model ---
-                st.info(f"Performing Deep Analysis with {best_model['name']}...")
+            # --- AI Deep Analysis using Selected Model ---
+            with st.spinner(f"Analyzing with {st.session_state.active_model['name']}..."):
+                best_model = st.session_state.active_model
                 
                 analysis_prompt = f"""
                 You are a Senior Interview Coach. Analyze this Resume against the Job Description.
