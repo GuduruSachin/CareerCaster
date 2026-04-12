@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import webbrowser
+import subprocess
 
 # --- Path Fix for Monorepo ---
 # Add the project root to sys.path so 'core' can be found
@@ -14,7 +15,6 @@ if PROJECT_ROOT not in sys.path:
 
 from pypdf import PdfReader
 from google import genai
-import google.generativeai as classic_genai
 import time
 import pandas as pd
 from core.security import SecurityManager
@@ -76,18 +76,13 @@ with st.sidebar:
                 
                 for m in test_models:
                     model_name = m["name"]
-                    sdk_to_use = "New (google-genai)" if m["gen"] >= 2 else "Classic (google-generativeai)"
+                    sdk_to_use = "New (google-genai)"
                     
                     for version in ["v1", "v1beta"]:
                         start_time = time.time()
                         try:
-                            if m["gen"] >= 2:
-                                client = genai.Client(api_key=api_key, http_options={'api_version': version})
-                                client.models.generate_content(model=model_name, contents=test_prompt)
-                            else:
-                                classic_genai.configure(api_key=api_key, transport='rest')
-                                model = classic_genai.GenerativeModel(model_name)
-                                model.generate_content(test_prompt)
+                            client = genai.Client(api_key=api_key, http_options={'api_version': version})
+                            client.models.generate_content(model=model_name, contents=test_prompt)
                             
                             latency = round(time.time() - start_time, 3)
                             results.append({
@@ -195,15 +190,9 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             {{"skills": ["...", "..."], "role": "...", "strategy": "..."}}
             """
             
-            if best_model["sdk"] == "New (google-genai)":
-                client = genai.Client(api_key=api_key, http_options={'api_version': best_model['version']})
-                response = client.models.generate_content(model=best_model['name'], contents=analysis_prompt)
-                full_response = response.text
-            else:
-                classic_genai.configure(api_key=api_key)
-                model = classic_genai.GenerativeModel(best_model['name'])
-                response = model.generate_content(analysis_prompt)
-                full_response = response.text
+            client = genai.Client(api_key=api_key, http_options={'api_version': best_model['version']})
+            response = client.models.generate_content(model=best_model['name'], contents=analysis_prompt)
+            full_response = response.text
             
             # Parse response
             try:
@@ -252,11 +241,20 @@ if st.session_state.saved and st.session_state.session_id:
         session_id = st.session_state.session_id
         uri = f"careercaster://start?session_id={session_id}"
         
-        # Using webbrowser module to trigger the URI
-        # Note: In a local environment, this opens the custom protocol handler
-        webbrowser.open(uri)
+        # Detached Desktop Launch
+        agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
+        python_exe = sys.executable.replace("python.exe", "pythonw.exe")
         
-        st.info(f"Triggering protocol: {uri}")
+        try:
+            # Creation flags for detached process on Windows
+            creation_flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen([python_exe, agent_path, uri], creationflags=creation_flags)
+            st.success("Stealth Agent launched in detached mode!")
+        except Exception as e:
+            st.error(f"Failed to launch agent directly: {e}")
+            st.info("Attempting fallback to protocol handler...")
+            webbrowser.open(uri)
+        
         st.balloons()
 
 # --- Footer ---

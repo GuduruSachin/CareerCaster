@@ -1,6 +1,5 @@
 streamlit==1.56.0
 pypdf==5.1.0
-google-generativeai==0.8.6
 google-genai==0.3.0
 pandas==3.0.2
 PyQt6==6.11.0

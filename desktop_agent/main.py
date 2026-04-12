@@ -306,7 +306,7 @@ class StealthOverlay(QWidget):
             print(f"Session {self.session_id} cleared.")
         except Exception as e:
             print(f"Error killing process: {e}")
-        QApplication.quit()
+        sys.exit(0)
 
     def start_audio_thread(self):
         if self.audio_thread:

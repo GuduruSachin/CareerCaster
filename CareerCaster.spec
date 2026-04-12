@@ -12,7 +12,6 @@ hidden_imports = [
     'cryptography',
     'cryptography.fernet',
     'cryptography.hazmat.primitives.kdf.pbkdf2',
-    'google.generativeai',
     'numpy'
 ]
 
