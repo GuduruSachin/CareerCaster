@@ -517,11 +517,18 @@ def main():
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
     
-    # Handshake: Check for session_id
-    url_arg = sys.argv[1] if len(sys.argv) > 1 else ""
-    parsed_url = urllib.parse.urlparse(url_arg)
-    params = urllib.parse.parse_qs(parsed_url.query)
-    session_id = params.get('session_id', [None])[0]
+    # Handshake: Capture session_id from arguments
+    session_id = None
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+        # Handle URI protocol (careercaster://start?session_id=...)
+        if "session_id=" in arg:
+            parsed_url = urllib.parse.urlparse(arg)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            session_id = params.get('session_id', [None])[0]
+        else:
+            # Handle raw session ID passed as direct argument
+            session_id = arg
     
     if not session_id:
         print("Error: No session_id provided.")

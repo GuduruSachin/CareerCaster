@@ -249,14 +249,20 @@ if st.session_state.saved and st.session_state.session_id:
         
         try:
             if os.path.exists(exe_path):
-                # Launch the compiled EXE
-                subprocess.Popen([exe_path, uri], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                # Launch the compiled EXE with raw session_id as direct argument
+                # shell=False (default) ensures arguments are passed correctly as a list
+                subprocess.Popen([exe_path, session_id], 
+                                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                                 shell=False)
                 st.success("Stealth Agent (EXE) launched!")
             else:
                 # Fallback to Python script for development
                 agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
                 python_exe = sys.executable.replace("python.exe", "pythonw.exe")
-                subprocess.Popen([python_exe, agent_path, uri], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                # For the script, we pass the full URI as it's the expected format for dev testing
+                subprocess.Popen([python_exe, agent_path, uri], 
+                                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                                 shell=False)
                 st.warning("EXE not found. Launched raw Python script instead.")
         except Exception as e:
             st.error(f"Failed to launch agent directly: {e}")
