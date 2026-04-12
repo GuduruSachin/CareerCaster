@@ -517,18 +517,14 @@ def main():
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
     
+    # Handshake: Check for session_id
     url_arg = sys.argv[1] if len(sys.argv) > 1 else ""
     parsed_url = urllib.parse.urlparse(url_arg)
     params = urllib.parse.parse_qs(parsed_url.query)
     session_id = params.get('session_id', [None])[0]
     
     if not session_id:
-        # If no session_id, don't just exit silently. 
-        # Show a message box or at least log it.
-        print("Error: No session_id provided. CareerCaster requires a session to start.")
-        # For debugging purposes, we'll allow it to continue with a dummy ID 
-        # or show a basic UI if you prefer, but for now, let's just make it obvious.
-        app = QApplication(sys.argv)
+        print("Error: No session_id provided.")
         from PyQt6.QtWidgets import QMessageBox
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Icon.Critical)

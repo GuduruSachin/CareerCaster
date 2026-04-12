@@ -244,15 +244,20 @@ if st.session_state.saved and st.session_state.session_id:
         session_id = st.session_state.session_id
         uri = f"careercaster://start?session_id={session_id}"
         
-        # Detached Desktop Launch
-        agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
-        python_exe = sys.executable.replace("python.exe", "pythonw.exe")
+        # Detached Desktop Launch (EXE Version)
+        exe_path = os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe")
         
         try:
-            # Creation flags for detached process on Windows
-            creation_flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-            subprocess.Popen([python_exe, agent_path, uri], creationflags=creation_flags)
-            st.success("Stealth Agent launched in detached mode!")
+            if os.path.exists(exe_path):
+                # Launch the compiled EXE
+                subprocess.Popen([exe_path, uri], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                st.success("Stealth Agent (EXE) launched!")
+            else:
+                # Fallback to Python script for development
+                agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
+                python_exe = sys.executable.replace("python.exe", "pythonw.exe")
+                subprocess.Popen([python_exe, agent_path, uri], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                st.warning("EXE not found. Launched raw Python script instead.")
         except Exception as e:
             st.error(f"Failed to launch agent directly: {e}")
             st.info("Attempting fallback to protocol handler...")
