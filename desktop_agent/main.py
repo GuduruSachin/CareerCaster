@@ -9,6 +9,7 @@ import ctypes
 import threading
 import time
 import io
+import multiprocessing
 
 # --- Path Fix for Monorepo & PyInstaller ---
 def get_resource_path(relative_path):
@@ -497,6 +498,9 @@ class StealthOverlay(QWidget):
         event.accept()
 
 def main():
+    # Required for PyInstaller + Windows Multiprocessing
+    multiprocessing.freeze_support()
+
     # Windows Taskbar Branding
     if sys.platform == "win32":
         try:
@@ -519,6 +523,19 @@ def main():
     session_id = params.get('session_id', [None])[0]
     
     if not session_id:
+        # If no session_id, don't just exit silently. 
+        # Show a message box or at least log it.
+        print("Error: No session_id provided. CareerCaster requires a session to start.")
+        # For debugging purposes, we'll allow it to continue with a dummy ID 
+        # or show a basic UI if you prefer, but for now, let's just make it obvious.
+        app = QApplication(sys.argv)
+        from PyQt6.QtWidgets import QMessageBox
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Critical)
+        msg.setText("CareerCaster Launch Error")
+        msg.setInformativeText("No session ID detected. Please launch the agent from the Web Hub.")
+        msg.setWindowTitle("Error")
+        msg.exec()
         sys.exit(1)
         
     sessions_dir = get_sessions_dir()

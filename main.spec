@@ -19,6 +19,7 @@ a = Analysis(
         'pyaudio',
         'google.genai',
         'numpy',
+        'PyQt6.sip',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
@@ -45,13 +46,13 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,           # Set to True temporarily if you want to see errors on launch
+    console=True, # Set to True for debugging; change to False for final release
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['assets/logo.ico'], # Formatted as a list for better compatibility
+    icon='assets/logo.ico',
 )
 
 coll = COLLECT(
