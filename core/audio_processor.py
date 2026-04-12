@@ -89,5 +89,21 @@ class AudioProcessor:
                 wf.writeframes(pcm_data)
             return wav_buffer.getvalue()
 
+    def get_ai_prompt(self, context_tags):
+        """
+        Returns the refined AI prompt for interview assistance.
+        """
+        return f"""
+        You are an interview assistant. Listen to this 4-second audio clip.
+        Context Tags: {json.dumps(context_tags)}
+        
+        CRITICAL INSTRUCTIONS:
+        1. Ignore the interviewee (Umesh). Only transcribe and answer questions asked by the interviewer.
+        2. If you hear a question, return a JSON object: {{"question": "...", "answer": "..."}}
+        3. The 'answer' MUST be under 20 words.
+        4. Use **BOLD** for technical keywords in the answer.
+        5. If no question is heard, return an empty string.
+        """
+
     def close(self):
         self.pa.terminate()

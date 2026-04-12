@@ -17,6 +17,7 @@ CareerCaster is a hybrid Python application designed to provide a real-time, ste
 
 ### 2. Install Dependencies
 ```bash
+pip uninstall google-generativeai -y
 pip install -r requirements.txt
 ```
 
@@ -34,8 +35,9 @@ streamlit run web_hub/app.py
 ## How it Works
 1. **Upload**: Paste your JD and upload your Resume PDF in the Web Hub.
 2. **Prepare**: Click "Save & Prepare" to generate a unique session ID and persist data.
-3. **Launch**: Click "START INTERVIEW". This triggers the `careercaster://` protocol.
-4. **Overlay**: The Desktop Agent launches an invisible-to-screen-share overlay providing real-time hints.
+3. **Launch**: Click "START INTERVIEW". This launches the Desktop Agent in **Detached Mode** (no CMD window).
+4. **Chat UI**: A modern, resizable, semi-transparent chat interface appears. It displays interviewer questions and AI advice in distinct bubbles. It is invisible to screen-sharing software.
+5. **Controls**: Use the header bar to take screenshots (📸), mute (🎤), or gracefully close the session (❌).
 
 ## Security & Stealth
 The Desktop Agent uses the Windows API `SetWindowDisplayAffinity` with `WDA_EXCLUDEFROMCAPTURE` to ensure the overlay is not visible to meeting software like Zoom, Teams, or OBS.

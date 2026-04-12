@@ -7,9 +7,8 @@ CareerCaster operates as a **Hybrid Bridge** application. It leverages the acces
 1. **Data Ingestion**: The Streamlit Web Hub (`web_hub/app.py`) collects user data (Resume, JD, API Key).
 2. **AI Deep Analysis**: The Web Hub calls Gemini 1.5 Flash to generate a "Battle Plan" based on the Resume and JD.
 3. **Persistence**: Data and the AI Analysis are serialized into a JSON file in the `/sessions` directory, keyed by a unique UUID.
-4. **Trigger**: The Web Hub uses the `webbrowser` module to call `careercaster://start?session_id={UUID}`.
-4. **Protocol Handling**: Windows intercepts the URI and launches `desktop_agent/main.py` with the URI as a command-line argument.
-5. **Agent Activation**: The Desktop Agent parses the UUID, reads the JSON from `/sessions`, and initializes the stealth overlay.
+4. **Trigger**: The Web Hub uses `subprocess.Popen` with `DETACHED_PROCESS` flags to launch the agent directly, with a fallback to the `careercaster://` protocol.
+5. **Agent Activation**: The Desktop Agent (`desktop_agent/main.py`) initializes using only the modern `google-genai` SDK.
 
 ## Security Mechanism: AES-256 Encryption
 To protect sensitive user data (Resume, JD, API Keys) at rest, CareerCaster implements a local security layer:
@@ -37,15 +36,17 @@ To ensure the assistant remains invisible during screen-sharing (Zoom/Teams/OBS)
 
 ## Real-Time Audio Pipeline
 1. **Capture**: `PyAudio` captures system output via **Windows WASAPI Loopback**.
-2. **Chunking**: Audio is buffered into 4-second chunks with a 1-second sliding window overlap for context.
-3. **Advanced Reasoning**: 
-    - **Context Tags**: Lean metadata (skills, role, strategy) extracted during web analysis.
-    - **Categorization**: Hints are tagged as `[TECHNICAL]`, `[BEHAVIORAL]`, or `[URGENT]`.
-4. **Processing**: Chunks are Base64 encoded and sent to Gemini 1.5 Flash as multimodal audio parts.
-5. **UI Update**: 
-    - **Rule of Three**: Maximum 3 hints visible at once.
-    - **Temporal Decay**: Hints fade after 30s and disappear after 45s.
-    - **Color-Coding**: Rich Text styling based on category.
+2. **Auto-Detection**: The system automatically detects the best sample rate (16kHz, 44.1kHz, or 48kHz) to ensure hardware compatibility.
+3. **Chunking**: Audio is buffered into 4-second chunks with a 1-second sliding window overlap for context.
+4. **Advanced Reasoning**: 
+    - **Voice Focus**: AI is instructed to ignore the interviewee and focus exclusively on the interviewer's voice.
+    - **Brevity**: AI answers are strictly limited to under 20 words for instant readability.
+    - **Formatting**: Technical keywords are automatically **BOLDED**.
+5. **Processing**: Chunks are processed exclusively using the `google-genai` SDK on the `v1beta` endpoint using the **Gemini 3.1 Flash-Lite** model for ultra-low latency.
+6. **UI Update**: 
+    - **Dual-Bubble Chat**: Interviewer questions (Left/Gray) and AI Advice (Right/Blue) are displayed in a scrollable chat interface.
+    - **Auto-Scroll**: The chat automatically scrolls to the bottom as new messages arrive.
+    - **Graceful Shutdown**: The agent ensures all threads are joined and resources released before exiting.
 
 ## Data Flow Diagram
 ```text
@@ -62,5 +63,6 @@ To ensure the assistant remains invisible during screen-sharing (Zoom/Teams/OBS)
 ```
 
 ## Security Considerations
-- **API Keys**: Stored locally in plain text within the `sessions/` folder. Future iterations should use Windows Credential Manager or encryption at rest.
-- **Registry**: Requires write access to `HKEY_CURRENT_USER`.
+- **API Keys**: Stored locally in encrypted `.cc` session files.
+- **Session Cleanup**: The session file is automatically deleted when the ❌ Close button is clicked in the overlay.
+- **Registry**: Custom protocol requires write access to `HKEY_CURRENT_USER`.
