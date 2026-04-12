@@ -52,13 +52,19 @@ class AudioProcessor:
         """
         Converts raw PCM data to a Base64 encoded WAV file string.
         """
+        return base64.b64encode(self.pcm_to_wav_bytes(pcm_data)).decode('utf-8')
+
+    def pcm_to_wav_bytes(self, pcm_data):
+        """
+        Converts raw PCM data to WAV file bytes.
+        """
         with io.BytesIO() as wav_buffer:
             with wave.open(wav_buffer, 'wb') as wf:
                 wf.setnchannels(self.channels)
                 wf.setsampwidth(self.pa.get_sample_size(self.format))
                 wf.setframerate(self.rate)
                 wf.writeframes(pcm_data)
-            return base64.b64encode(wav_buffer.getvalue()).decode('utf-8')
+            return wav_buffer.getvalue()
 
     def close(self):
         self.pa.terminate()

@@ -13,7 +13,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-import google.generativeai as genai
+from google import genai
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFrame, QSystemTrayIcon, QMenu, QScrollArea)
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QTimer
@@ -39,9 +39,11 @@ class AudioCaptureThread(QThread):
         self.is_muted = False
         self.processor = AudioProcessor()
         
-        # Configure Gemini
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Initialize new google-genai client forcing v1 stable endpoint
+        self.client = genai.Client(
+            api_key=self.api_key,
+            http_options={'api_version': 'v1'}
+        )
 
     def run(self):
         device_index = self.processor.find_wasapi_loopback_device()
@@ -115,10 +117,17 @@ class AudioCaptureThread(QThread):
             If irrelevant, return an empty string.
             """
             
-            response = self.model.generate_content([
-                prompt,
-                {'mime_type': 'audio/wav', 'data': base64_audio}
-            ])
+            # Using gemini-3-flash-preview with the new SDK pattern
+            response = self.client.models.generate_content(
+                model='gemini-3-flash-preview',
+                contents=[
+                    prompt,
+                    genai.types.Part.from_bytes(
+                        data=self.processor.pcm_to_wav_bytes(raw_pcm),
+                        mime_type='audio/wav'
+                    )
+                ]
+            )
             
             hint = response.text.strip()
             if hint:

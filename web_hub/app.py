@@ -13,7 +13,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from pypdf import PdfReader
-import google.generativeai as genai
+from google import genai
 from core.security import SecurityManager
 from core.paths import get_sessions_dir
 
@@ -65,8 +65,11 @@ if st.button("💾 Save & Prepare"):
             
             # --- AI Deep Analysis ---
             with st.spinner("AI is analyzing your profile against the JD..."):
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash-latest') # Using flash for speed
+                # Initialize new google-genai client forcing v1 stable endpoint
+                client = genai.Client(
+                    api_key=api_key,
+                    http_options={'api_version': 'v1'}
+                )
                 
                 prompt = f"""
                 You are a Senior Interview Coach. Analyze this Resume against the Job Description.
@@ -90,7 +93,11 @@ if st.button("💾 Save & Prepare"):
                 {{"skills": ["...", "..."], "role": "...", "strategy": "..."}}
                 """
                 
-                response = model.generate_content(prompt)
+                # Using gemini-3-flash-preview as requested
+                response = client.models.generate_content(
+                    model='gemini-3-flash-preview',
+                    contents=prompt
+                )
                 full_response = response.text
                 
                 # Parse response
