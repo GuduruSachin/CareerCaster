@@ -147,6 +147,9 @@ with st.sidebar:
             
             preview_mode = st.toggle("Preview Mode (No AI Costs)", value=True, help="Skips Gemini API calls in the agent. Useful for testing hardware.")
             disable_stealth = st.toggle("Disable Stealth Mode", value=False, help="If the agent crashes on startup, try disabling this. It prevents the window from being hidden from screen capture.")
+            
+            st.divider()
+            test_mode = st.toggle("🛠️ TEST MODE (Auto-Fill)", value=False, help="Injects mock data to skip manual entry for testing.")
 
     st.info("The API key is required for real-time hint generation in the local agent.")
 
@@ -171,19 +174,25 @@ if resume_file:
                 st.session_state.resume_text = text.strip()
             except Exception as e:
                 st.error(f"Error reading PDF: {e}")
+elif "test_mode" in locals() and test_mode:
+    if not st.session_state.resume_text:
+        st.session_state.resume_text = "MOCK RESUME: Senior Software Engineer with 10 years of experience in Python, PyQt6, and AI integration. Expert in building stealth desktop agents and real-time UI overlays."
+    st.info("🛠️ TEST MODE: Using Mock Resume Data")
 
-        if st.session_state.resume_text:
-            if st.button("🔍 Review Extracted Text"):
-                show_text_dialog(st.session_state.resume_text)
+if st.session_state.resume_text:
+    if st.button("🔍 Review Extracted Text"):
+        show_text_dialog(st.session_state.resume_text)
 
 # Job Description Text Area
-jd_text = st.text_area("Paste Job Description (JD)", height=200, placeholder="Paste the full job description here...")
+default_jd = "Software Developer - Testing Mode" if ("test_mode" in locals() and test_mode) else ""
+jd_text = st.text_area("Paste Job Description (JD)", height=200, value=default_jd, placeholder="Paste the full job description here...")
 
 # Project Notes (RAG Context)
-project_notes = st.text_area("Project Notes / Key Achievements", height=150, placeholder="Add specific project details, metrics, or notes you want the AI to use for STAR answers...")
+default_notes = "Built a real-time interview assistant using Gemini 1.5 Flash and PyQt6." if ("test_mode" in locals() and test_mode) else ""
+project_notes = st.text_area("Project Notes / Key Achievements", height=150, value=default_notes, placeholder="Add specific project details, metrics, or notes you want the AI to use for STAR answers...")
 
 # --- Handshake Logic ---
-can_prepare = st.session_state.api_verified and resume_file and jd_text
+can_prepare = st.session_state.api_verified and (resume_file or ("test_mode" in locals() and test_mode)) and (jd_text or ("test_mode" in locals() and test_mode))
 
 if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
     try:
@@ -273,6 +282,15 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             print(f"Sync: EXE dist folder not found at {exe_dist_dir}. Skipping sync.")
         
         st.session_state.saved = True
+        
+        # Persistence: Store last used session ID locally
+        try:
+            last_session_file = os.path.join(PROJECT_ROOT, ".last_session")
+            with open(last_session_file, "w") as f:
+                f.write(session_id)
+        except:
+            pass
+            
         st.success(f"Session {session_id} prepared and ENCRYPTED!")
         
     except Exception as e:
@@ -354,4 +372,21 @@ if st.session_state.saved and st.session_state.session_id:
 
 # --- Footer ---
 st.markdown("---")
+
+# Persistence: Load last used session ID if available
+try:
+    last_session_file = os.path.join(PROJECT_ROOT, ".last_session")
+    if os.path.exists(last_session_file):
+        with open(last_session_file, "r") as f:
+            last_id = f.read().strip()
+            if last_id:
+                st.caption(f"Last Prepared Session: `{last_id}`")
+                if not st.session_state.session_id:
+                    if st.button("♻️ Reload Last Session"):
+                        st.session_state.session_id = last_id
+                        st.session_state.saved = True
+                        st.rerun()
+except:
+    pass
+
 st.caption("CareerCaster v1.0 | Hybrid Python Application")

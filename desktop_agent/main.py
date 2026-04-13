@@ -45,6 +45,9 @@ HOTKEY_ID = 1
 GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
 
+# Global Instance Protection: Prevents Garbage Collector from deleting windows
+_PERSISTENT_WINDOWS = []
+
 class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
     new_prediction = pyqtSignal(str) # prediction text
@@ -580,13 +583,17 @@ class StealthOverlay(QWidget):
             print("Stealth Mode: Not on Windows, skipping.", flush=True)
 
     def init_ui(self):
-        print("Overlay: Initializing UI Layout...", flush=True)
+        print("Overlay: Initializing UI Layout (DIAGNOSTIC MODE)...", flush=True)
+        # DIAGNOSTIC: Standard window with title bar and borders
         self.setWindowFlags(
             Qt.WindowType.WindowStaysOnTopHint | 
-            Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        # DIAGNOSTIC: Disable transparency
+        # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        # DIAGNOSTIC: Solid Red Background for visibility
+        self.setStyleSheet("background-color: #FF0000; border: 5px solid white;")
         
         # Set Window Icon
         icon_path = os.path.join(get_assets_dir(), "logo.ico")
@@ -1003,9 +1010,10 @@ def main():
                 
             print("Startup: Creating StealthOverlay instance...", flush=True)
             overlay = StealthOverlay(session_id, session_data)
+            _PERSISTENT_WINDOWS.append(overlay)
             
-            # Fix: Explicitly register as a Layered Window via Win32 API
-            # This ensures frameless windows render correctly on all Windows versions
+            # DIAGNOSTIC: Comment out manual Win32 style calls
+            """
             if sys.platform == "win32":
                 try:
                     hwnd = int(overlay.winId())
@@ -1014,6 +1022,7 @@ def main():
                     print("Startup: WS_EX_LAYERED style applied.", flush=True)
                 except Exception as e:
                     print(f"Startup: Win32 Style Error: {e}", flush=True)
+            """
 
             print("Startup: StealthOverlay instance created successfully.", flush=True)
             print("Startup: Showing Overlay...", flush=True)
@@ -1063,10 +1072,18 @@ def main():
             tray_icon.setToolTip("CareerCaster Stealth Agent")
             tray_icon.show()
             
-            print("Agent: Entering Event Loop...", flush=True)
-            exit_code = app.exec()
-            print(f"Agent: Event Loop Terminated with code {exit_code}.", flush=True)
-            sys.exit(exit_code)
+            print("Startup: Entering Event Loop...", flush=True)
+            try:
+                exit_code = app.exec()
+                print(f"Startup: Event Loop Exited with code {exit_code}", flush=True)
+                sys.exit(exit_code)
+            except Exception as e:
+                import traceback
+                print("\n" + "!"*50, flush=True)
+                print("CRITICAL: Event Loop Failed to Start!", flush=True)
+                traceback.print_exc()
+                print("!"*50 + "\n", flush=True)
+                raise e
         except Exception as e:
             # Re-raise to be caught by the outer try-except
             raise e
@@ -1110,4 +1127,13 @@ if __name__ == "__main__":
         print("="*50)
         traceback.print_exc()
         print("="*50)
-        input('\nPress Enter to exit...')
+
+# FINAL DIAGNOSTIC: Prevent CMD window from closing under any circumstances
+print("\n" + "!"*50, flush=True)
+print("DIAGNOSTIC: Script reached end of file.", flush=True)
+print("If you see this, the process terminated unexpectedly.", flush=True)
+print("!"*50 + "\n", flush=True)
+try:
+    input("CRITICAL: Script reached end of file. Press Enter to exit...")
+except EOFError:
+    pass
