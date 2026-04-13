@@ -25,23 +25,19 @@ def get_exe_dir():
 def get_sessions_dir():
     """
     Returns the path to the sessions directory.
-    Sessions should be relative to the EXE to persist across runs.
+    Ensures that both Web Hub and Agent use the same physical directory.
     """
-    root = get_exe_dir()
-    sessions_dir = os.path.join(root, "sessions")
+    if getattr(sys, 'frozen', False):
+        # Running as EXE
+        base = os.path.dirname(sys.executable)
+    else:
+        # Running as Script - Use the project root (one level up from core/)
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    sessions_dir = os.path.join(base, "sessions")
     
     if not os.path.exists(sessions_dir):
-        try:
-            os.makedirs(sessions_dir)
-        except Exception as e:
-            # Fallback to user's AppData if local directory is read-only
-            appdata = os.getenv('APPDATA')
-            if appdata:
-                sessions_dir = os.path.join(appdata, "CareerCaster", "sessions")
-                if not os.path.exists(sessions_dir):
-                    os.makedirs(sessions_dir)
-            else:
-                raise e
+        os.makedirs(sessions_dir, exist_ok=True)
                 
     return sessions_dir
 

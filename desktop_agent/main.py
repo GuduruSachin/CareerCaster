@@ -69,8 +69,8 @@ class AudioCaptureThread(QThread):
         self.SILENCE_LIMIT_MS = 600 # Trigger after 600ms of silence (faster)
         self.MIN_SPEECH_MS = 150 # Ignore very short noises
         
-        # 30ms frames for VAD precision
-        self.processor = AudioProcessor(chunk_size=480) 
+        # Delay processor init to run() to avoid UI hang
+        self.processor = None
         self.stream = None
         
         # Initialize new google-genai client forcing v1beta endpoint
@@ -80,6 +80,9 @@ class AudioCaptureThread(QThread):
         )
 
     def run(self):
+        # Initialize processor here to avoid blocking UI thread during startup
+        self.processor = AudioProcessor(chunk_size=480)
+        
         device_index = self.processor.find_wasapi_loopback_device()
         if device_index is None:
             self.status_update.emit("● NO AUDIO", "#FF5555")
@@ -822,9 +825,12 @@ class StealthOverlay(QWidget):
         event.accept()
 
 def main():
-    try:
-        # Required for PyInstaller + Windows Multiprocessing
+    # Critical for PyInstaller + Multiprocessing on Windows
+    if sys.platform == "win32":
         multiprocessing.freeze_support()
+
+    print(f"Startup: CareerCaster Agent starting. Args: {sys.argv}")
+    try:
 
         # High-DPI Scaling Optimization
         if hasattr(Qt, 'HighDpiScaleFactorRoundingPolicy'):
@@ -880,6 +886,7 @@ def main():
         print(f"Startup: Looking for session at {session_path}")
     
         try:
+            print(f"Startup: Initializing StealthOverlay for session {session_id}")
             if not os.path.exists(session_path):
                 error_msg = f"Session data not found.\n\nExpected at: {session_path}"
                 raise FileNotFoundError(error_msg)
@@ -891,7 +898,11 @@ def main():
                 session_data = json.loads(decrypted_json)
                 
             overlay = StealthOverlay(session_id, session_data)
+            print("Startup: Showing Overlay...")
             overlay.show()
+            overlay.raise_()
+            overlay.activateWindow()
+            print("Startup: Overlay visible.")
 
             tray_icon = QSystemTrayIcon(app)
             if os.path.exists(icon_path):
@@ -919,13 +930,21 @@ def main():
             # Re-raise to be caught by the outer try-except
             raise e
     except Exception as e:
-        # Global Error Resilience: Log to crash.log
+        # Global Error Resilience: Log to crash.log and startup_error.log
         import traceback
-        with open("crash.log", "a") as f:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"\n[{timestamp}] CRASH DETECTED:\n")
-            f.write(traceback.format_exc())
-            f.write("-" * 50 + "\n")
+        log_path = os.path.join(os.getcwd(), "crash.log")
+        startup_log_path = os.path.join(os.getcwd(), "startup_error.log")
+        
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        error_details = f"\n[{timestamp}] CRASH DETECTED:\n{traceback.format_exc()}\n{'-' * 50}\n"
+        
+        try:
+            with open(log_path, "a") as f:
+                f.write(error_details)
+            with open(startup_log_path, "a") as f:
+                f.write(error_details)
+        except:
+            pass
         
         print(f"Critical Error: {e}")
         from PyQt6.QtWidgets import QMessageBox

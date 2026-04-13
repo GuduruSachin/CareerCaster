@@ -291,15 +291,20 @@ if st.session_state.saved and st.session_state.session_id:
             if os.path.exists(exe_path):
                 # Launch the compiled EXE with raw session_id as direct argument
                 # Using CREATE_NEW_CONSOLE as requested for robust Windows handshake
+                exe_dir = os.path.dirname(exe_path)
                 subprocess.Popen([exe_path, session_id], 
+                                 cwd=exe_dir,
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.success("Stealth Agent (EXE) launched!")
             else:
                 # Fallback to Python script for development
                 agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
-                python_exe = sys.executable.replace("python.exe", "pythonw.exe")
+                agent_dir = os.path.dirname(agent_path)
+                # Use python.exe (with console) instead of pythonw.exe for better debugging in dev
+                python_exe = sys.executable 
                 # Pass raw session_id directly to the script as well
                 subprocess.Popen([python_exe, agent_path, session_id], 
+                                 cwd=agent_dir,
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.warning("EXE not found. Launched raw Python script instead.")
         except Exception as e:
