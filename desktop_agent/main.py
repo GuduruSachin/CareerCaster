@@ -50,6 +50,7 @@ class AudioCaptureThread(QThread):
 
     def __init__(self, session_data):
         super().__init__()
+        print("AudioThread: __init__ started", flush=True)
         self.session_data = session_data
         self.api_key = session_data.get("api_key")
         self.preview_mode = session_data.get("preview_mode", False)
@@ -74,10 +75,13 @@ class AudioCaptureThread(QThread):
         self.stream = None
         
         # Initialize new google-genai client forcing v1beta endpoint
+        print("AudioThread: Initializing Gemini Client...", flush=True)
         self.client = genai.Client(
             api_key=self.api_key,
             http_options={'api_version': 'v1beta'}
         )
+        print("AudioThread: Gemini Client initialized.", flush=True)
+        print("AudioThread: __init__ complete", flush=True)
 
     def run(self):
         # Initialize processor here to avoid blocking UI thread during startup
@@ -464,18 +468,25 @@ class PersonaFlashLabel(QLabel):
 class StealthOverlay(QWidget):
     def __init__(self, session_id, data):
         super().__init__()
+        print("Overlay: __init__ started", flush=True)
         self.session_id = session_id
         self.data = data
         self.old_pos = None
         self.audio_thread = None
         
+        print("Overlay: Initializing UI...", flush=True)
         self.init_ui()
+        print("Overlay: Applying Stealth Mode...", flush=True)
         self.apply_stealth_mode()
+        print("Overlay: Starting Audio Thread...", flush=True)
         self.start_audio_thread()
+        print("Overlay: Registering Global Hotkey...", flush=True)
         self.register_global_hotkey()
         
         # Persona Flash Label
+        print("Overlay: Creating Persona Flash Label...", flush=True)
         self.persona_flash = PersonaFlashLabel(self.container)
+        print("Overlay: __init__ complete", flush=True)
 
     def register_global_hotkey(self):
         """Registers the Ctrl+Shift+K global hotkey using Windows API."""
@@ -853,12 +864,24 @@ def main():
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))
         
-        # Handshake: Capture session_id from arguments
+        # Handshake: Capture session_id or absolute path from arguments
         raw_arg = sys.argv[1] if len(sys.argv) > 1 else None
         session_id = None
+        session_path = None
         
         if raw_arg:
-            if "careercaster://" in raw_arg:
+            # Clean quotes added by shell/shlex
+            raw_arg = raw_arg.strip("'\"")
+            
+            # Check if it's an absolute path to a .cc file
+            is_path = raw_arg.lower().endswith(".cc") and (os.path.isabs(raw_arg) or (len(raw_arg) > 2 and raw_arg[1] == ":"))
+            
+            if is_path:
+                # Absolute path passed directly
+                session_path = os.path.abspath(raw_arg)
+                session_id = os.path.basename(session_path).replace(".cc", "")
+                print(f"Startup: Detected absolute session path: {session_path}", flush=True)
+            elif "careercaster://" in raw_arg:
                 # Parse URI: careercaster://start?session_id=UUID
                 try:
                     parsed = urllib.parse.urlparse(raw_arg)
@@ -870,8 +893,8 @@ def main():
                 # Direct UUID
                 session_id = raw_arg
         
-        if not session_id:
-            print("Error: No session ID detected.")
+        if not session_id and not session_path:
+            print("Error: No session ID or path detected.")
             from PyQt6.QtWidgets import QMessageBox
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Icon.Critical)
@@ -881,28 +904,45 @@ def main():
             msg.exec()
             sys.exit(1)
             
-        sessions_dir = get_sessions_dir()
-        session_path = os.path.join(sessions_dir, f"{session_id}.cc")
+        if not session_path:
+            sessions_dir = get_sessions_dir()
+            session_path = os.path.join(sessions_dir, f"{session_id}.cc")
+            
         print(f"Startup: Looking for session at {session_path}")
     
         try:
-            print(f"Startup: Initializing StealthOverlay for session {session_id}")
+            print(f"Startup: Initializing StealthOverlay for session {session_id}", flush=True)
             if not os.path.exists(session_path):
                 error_msg = f"Session data not found.\n\nExpected at: {session_path}"
                 raise FileNotFoundError(error_msg)
                 
+            print("Startup: Initializing SecurityManager...", flush=True)
             security = SecurityManager()
+            print("Startup: SecurityManager initialized.", flush=True)
+            
             with open(session_path, 'rb') as f:
                 encrypted_data = f.read()
+                print(f"Startup: Read {len(encrypted_data)} bytes of encrypted data.", flush=True)
                 decrypted_json = security.decrypt_data(encrypted_data)
+                print("Startup: Data decrypted successfully.", flush=True)
                 session_data = json.loads(decrypted_json)
+                print("Startup: Session data loaded.", flush=True)
                 
+            print("Startup: Creating StealthOverlay instance...", flush=True)
             overlay = StealthOverlay(session_id, session_data)
-            print("Startup: Showing Overlay...")
+            print("Startup: StealthOverlay instance created.", flush=True)
+            print("Startup: Showing Overlay...", flush=True)
             overlay.show()
+            print("Startup: Overlay show() called.", flush=True)
             overlay.raise_()
             overlay.activateWindow()
-            print("Startup: Overlay visible.")
+            print("Startup: Overlay visible.", flush=True)
+
+            # Keep console open for debugging
+            print("\n" + "="*50, flush=True)
+            print("AGENT IS RUNNING IN STEALTH MODE", flush=True)
+            print("Minimize this window, but do NOT close it.", flush=True)
+            print("="*50 + "\n", flush=True)
 
             tray_icon = QSystemTrayIcon(app)
             if os.path.exists(icon_path):
@@ -947,14 +987,26 @@ def main():
             pass
         
         print(f"Critical Error: {e}")
-        from PyQt6.QtWidgets import QMessageBox
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Critical)
-        msg.setText("CareerCaster Startup Error")
-        msg.setInformativeText(str(e))
-        msg.setWindowTitle("Error")
-        msg.exec()
-        sys.exit(1)
+        try:
+            from PyQt6.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Critical)
+            msg.setText("CareerCaster Startup Error")
+            msg.setInformativeText(str(e))
+            msg.setWindowTitle("Error")
+            msg.exec()
+        except:
+            pass
+        raise e
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (Exception, SystemExit):
+        import traceback
+        print("\n" + "="*50)
+        print("CRASH DETECTED IN STARTUP SEQUENCE")
+        print("="*50)
+        traceback.print_exc()
+        print("="*50)
+        input('\nPress Enter to exit...')

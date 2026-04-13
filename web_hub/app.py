@@ -5,6 +5,7 @@ import os
 import sys
 import webbrowser
 import subprocess
+import shlex
 
 # --- Path Fix for Monorepo ---
 # Add the project root to sys.path so 'core' can be found
@@ -24,8 +25,23 @@ from core.paths import get_sessions_dir
 # Automatically create the sessions/ directory if it does not exist
 SESSIONS_DIR = get_sessions_dir()
 
+def check_permissions():
+    """Verifies that the app has write permissions in the project root."""
+    try:
+        test_file = os.path.join(PROJECT_ROOT, ".perm_test")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        return True
+    except Exception as e:
+        st.error(f"Permission Error: The application does not have write access to {PROJECT_ROOT}. Error: {e}")
+        return False
+
 # --- Streamlit UI Setup ---
 st.set_page_config(page_title="CareerCaster Dashboard", page_icon="💼")
+
+if not check_permissions():
+    st.stop()
 
 # --- Session State Initialization ---
 if "session_id" not in st.session_state:
@@ -287,26 +303,46 @@ if st.session_state.saved and st.session_state.session_id:
         # Detached Desktop Launch (EXE Version)
         exe_path = os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe")
         
+        # Calculate absolute session path to remove guesswork
+        abs_session_path = os.path.abspath(os.path.join(get_sessions_dir(), f"{session_id}.cc"))
+        
         try:
+            process = None
             if os.path.exists(exe_path):
-                # Launch the compiled EXE with raw session_id as direct argument
-                # Using CREATE_NEW_CONSOLE as requested for robust Windows handshake
                 exe_dir = os.path.dirname(exe_path)
-                subprocess.Popen([exe_path, session_id], 
-                                 cwd=exe_dir,
-                                 creationflags=subprocess.CREATE_NEW_CONSOLE)
-                st.success("Stealth Agent (EXE) launched!")
+                # Use the session file that was synced to the EXE folder
+                exe_session_path = os.path.abspath(os.path.join(exe_dir, "sessions", f"{session_id}.cc"))
+                
+                cmd_list = [exe_path, exe_session_path]
+                cmd_str = ' '.join([f'"{x}"' for x in cmd_list])
+                print(f"DEBUG: Launching EXE: {cmd_str}")
+                
+                st.info("If the window doesn't appear, run this in CMD:")
+                st.code(cmd_str)
+                
+                process = subprocess.Popen(cmd_list, 
+                                         cwd=exe_dir,
+                                         creationflags=subprocess.CREATE_NEW_CONSOLE)
+                st.success("Stealth Agent (EXE) launch initiated!")
             else:
-                # Fallback to Python script for development
                 agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
                 agent_dir = os.path.dirname(agent_path)
-                # Use python.exe (with console) instead of pythonw.exe for better debugging in dev
                 python_exe = sys.executable 
-                # Pass raw session_id directly to the script as well
-                subprocess.Popen([python_exe, agent_path, session_id], 
-                                 cwd=agent_dir,
-                                 creationflags=subprocess.CREATE_NEW_CONSOLE)
+                # For script launch, use the root session path
+                cmd_list = [python_exe, agent_path, abs_session_path]
+                print(f"DEBUG: Launching Script: {' '.join([f'\"{x}\"' for x in cmd_list])}")
+                
+                process = subprocess.Popen(cmd_list, 
+                                         cwd=agent_dir,
+                                         creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.warning("EXE not found. Launched raw Python script instead.")
+            
+            # Subprocess Monitoring: Wait 2 seconds to see if it crashes
+            if process:
+                time.sleep(2.0)
+                poll = process.poll()
+                if poll is not None:
+                    st.error(f"Agent exited immediately with code {poll}. Check the CMD window for errors.")
         except Exception as e:
             st.error(f"Failed to launch agent directly: {e}")
             st.info("Attempting fallback to protocol handler...")

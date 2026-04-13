@@ -1,11 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 block_cipher = None
 
 a = Analysis(
     ['desktop_agent/main.py'],
     pathex=[],
-    binaries=[],
+    binaries=collect_dynamic_libs('pyaudio'),
     datas=[
         ('assets', 'assets'),
         ('core', 'core'),
@@ -45,11 +46,11 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='CareerCaster',
-    debug=False,
+    debug=True, # Temporarily set to True to catch launch failures
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # Set to False for final release stealth
+    console=True, # Set to True to see the console output during debug
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
