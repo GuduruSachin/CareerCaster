@@ -146,6 +146,7 @@ with st.sidebar:
             st.session_state.active_model = success_models[selected_index]
             
             preview_mode = st.toggle("Preview Mode (No AI Costs)", value=True, help="Skips Gemini API calls in the agent. Useful for testing hardware.")
+            disable_stealth = st.toggle("Disable Stealth Mode", value=False, help="If the agent crashes on startup, try disabling this. It prevents the window from being hidden from screen capture.")
 
     st.info("The API key is required for real-time hint generation in the local agent.")
 
@@ -240,7 +241,8 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             "analysis": analysis,
             "context_tags": context_tags,
             "active_model": best_model,
-            "preview_mode": preview_mode
+            "preview_mode": preview_mode,
+            "disable_stealth": disable_stealth
         }
         
         security = SecurityManager()

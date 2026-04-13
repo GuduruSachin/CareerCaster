@@ -41,6 +41,10 @@ MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 HOTKEY_ID = 1
 
+# Win32 Window Styles
+GWL_EXSTYLE = -20
+WS_EX_LAYERED = 0x00080000
+
 class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
     new_prediction = pyqtSignal(str) # prediction text
@@ -436,6 +440,7 @@ class ChatBubble(QFrame):
 
 class PersonaFlashLabel(QLabel):
     def __init__(self, parent):
+        print("PersonaFlash: __init__ started", flush=True)
         super().__init__(parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("""
@@ -451,6 +456,7 @@ class PersonaFlashLabel(QLabel):
         self.fade_timer = QTimer()
         self.fade_timer.setSingleShot(True)
         self.fade_timer.timeout.connect(self.hide)
+        print("PersonaFlash: __init__ complete", flush=True)
 
     def flash(self, text):
         self.setText(text)
@@ -476,12 +482,20 @@ class StealthOverlay(QWidget):
         
         print("Overlay: Initializing UI...", flush=True)
         self.init_ui()
-        print("Overlay: Applying Stealth Mode...", flush=True)
-        self.apply_stealth_mode()
+        
+        # Move Stealth Mode to a timer to ensure window is fully realized
+        if not self.data.get("disable_stealth", False):
+            print("Overlay: Scheduling Stealth Mode...", flush=True)
+            QTimer.singleShot(500, self.apply_stealth_mode)
+        else:
+            print("Overlay: Stealth Mode disabled by user.", flush=True)
+        
         print("Overlay: Starting Audio Thread...", flush=True)
         self.start_audio_thread()
-        print("Overlay: Registering Global Hotkey...", flush=True)
-        self.register_global_hotkey()
+        
+        # Move Hotkey Registration to a timer to ensure window is fully realized
+        print("Overlay: Scheduling Global Hotkey...", flush=True)
+        QTimer.singleShot(1000, self.register_global_hotkey)
         
         # Persona Flash Label
         print("Overlay: Creating Persona Flash Label...", flush=True)
@@ -490,14 +504,38 @@ class StealthOverlay(QWidget):
 
     def register_global_hotkey(self):
         """Registers the Ctrl+Shift+K global hotkey using Windows API."""
+        print("Hotkey: Starting registration...", flush=True)
         if sys.platform == "win32":
             try:
-                hwnd = int(self.winId())
+                user32 = ctypes.windll.user32
+                # Define types for safety
+                user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+                user32.RegisterHotKey.restype = wintypes.BOOL
+                
+                print("Hotkey: Getting winId...", flush=True)
+                try:
+                    hwnd_raw = self.winId()
+                    print(f"Hotkey: Raw winId type: {type(hwnd_raw)}", flush=True)
+                    hwnd = int(hwnd_raw)
+                    print(f"Hotkey: HWND = {hwnd}", flush=True)
+                except Exception as e_win:
+                    print(f"Hotkey: CRITICAL ERROR getting winId: {e_win}", flush=True)
+                    return
+                
                 # Register Ctrl+Shift+K (K = 0x4B)
-                if not ctypes.windll.user32.RegisterHotKey(hwnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, 0x4B):
-                    print("Warning: Failed to register global Kill-Switch hotkey.")
+                print(f"Hotkey: Calling RegisterHotKey(ID={HOTKEY_ID}, MOD={MOD_CONTROL | MOD_SHIFT}, KEY=0x4B)...", flush=True)
+                result = user32.RegisterHotKey(hwnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, 0x4B)
+                print(f"Hotkey: RegisterHotKey result = {result}", flush=True)
+                
+                if not result:
+                    error_code = ctypes.windll.kernel32.GetLastError()
+                    print(f"Warning: Failed to register global Kill-Switch hotkey. Error Code: {error_code}", flush=True)
+                else:
+                    print("Hotkey: Registered successfully.", flush=True)
             except Exception as e:
-                print(f"Hotkey Registration Error: {e}")
+                print(f"Hotkey Registration Error: {e}", flush=True)
+        else:
+            print("Hotkey: Not on Windows, skipping.", flush=True)
 
     def nativeEvent(self, eventType, message):
         """Handles Windows native events, specifically the global hotkey."""
@@ -511,19 +549,41 @@ class StealthOverlay(QWidget):
 
     def apply_stealth_mode(self):
         """Hides the window from screen capture software (Zoom, Teams)."""
+        print("Stealth Mode: Attempting to apply...", flush=True)
         if sys.platform == "win32":
             try:
+                user32 = ctypes.windll.user32
+                if not hasattr(user32, 'SetWindowDisplayAffinity'):
+                    print("Stealth Mode: SetWindowDisplayAffinity not supported on this Windows version.", flush=True)
+                    return
+                
+                # Define types for safety
+                user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
+                user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
+                
                 hwnd = int(self.winId())
+                print(f"Stealth Mode: HWND = {hwnd}", flush=True)
+                
                 # WDA_EXCLUDEFROMCAPTURE = 0x11 (17)
-                ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
-                print("Stealth Mode: Window excluded from screen capture.")
+                print(f"Stealth Mode: Calling SetWindowDisplayAffinity with {WDA_EXCLUDEFROMCAPTURE}...", flush=True)
+                result = user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+                print(f"Stealth Mode: SetWindowDisplayAffinity result = {result}", flush=True)
+                
+                if not result:
+                    error_code = ctypes.windll.kernel32.GetLastError()
+                    print(f"Stealth Mode: Failed with error code {error_code}", flush=True)
+                else:
+                    print("Stealth Mode: Window excluded from screen capture.", flush=True)
             except Exception as e:
-                print(f"Stealth Mode Error: {e}")
+                print(f"Stealth Mode Error: {e}", flush=True)
+        else:
+            print("Stealth Mode: Not on Windows, skipping.", flush=True)
 
     def init_ui(self):
+        print("Overlay: Initializing UI Layout...", flush=True)
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.WindowStaysOnTopHint | 
+            Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -541,8 +601,8 @@ class StealthOverlay(QWidget):
         
         self.container.setStyleSheet(f"""
             #MainContainer {{
-                background-color: rgba(15, 15, 15, 180);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background-color: rgba(15, 15, 15, 230);
+                border: 2px solid {border_color};
                 border-radius: 20px;
             }}
         """)
@@ -670,9 +730,16 @@ class StealthOverlay(QWidget):
         self.sizegrip = QSizeGrip(self)
         self.sizegrip.setFixedSize(16, 16)
         
+        # Force a reliable default size and position
         self.resize(400, 550)
         screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - 420, 60)
+        if screen.width() == 0 or screen.height() == 0:
+            print("Warning: Screen geometry detected as 0x0. Forcing fallback center.", flush=True)
+            self.move(100, 100)
+        else:
+            self.move(screen.width() - 420, 60)
+            
+        print(f"Overlay: Window Geometry is {self.geometry()}", flush=True)
 
     def toggle_plan(self):
         is_visible = self.plan_container.isVisible()
@@ -710,16 +777,22 @@ class StealthOverlay(QWidget):
             os._exit(0)
 
     def start_audio_thread(self):
+        print("Overlay: start_audio_thread() called.", flush=True)
         if self.audio_thread:
+            print("Overlay: Stopping existing audio thread...", flush=True)
             self.audio_thread.stop()
             
+        print("Overlay: Initializing AudioCaptureThread...", flush=True)
         self.audio_thread = AudioCaptureThread(self.data)
         self.audio_thread.new_chat_message.connect(self.add_message)
         self.audio_thread.new_prediction.connect(self.update_prediction)
         self.audio_thread.stream_chunk.connect(self.handle_stream_chunk)
         self.audio_thread.status_update.connect(self.update_status)
         self.audio_thread.audio_health_signal.connect(self.update_audio_health)
+        
+        print("Overlay: Starting AudioCaptureThread...", flush=True)
         self.audio_thread.start()
+        print("Overlay: AudioCaptureThread started.", flush=True)
 
     def update_prediction(self, text):
         self.pro_tip_text.setText(text)
@@ -930,12 +1003,37 @@ def main():
                 
             print("Startup: Creating StealthOverlay instance...", flush=True)
             overlay = StealthOverlay(session_id, session_data)
-            print("Startup: StealthOverlay instance created.", flush=True)
+            
+            # Fix: Explicitly register as a Layered Window via Win32 API
+            # This ensures frameless windows render correctly on all Windows versions
+            if sys.platform == "win32":
+                try:
+                    hwnd = int(overlay.winId())
+                    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                    ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED)
+                    print("Startup: WS_EX_LAYERED style applied.", flush=True)
+                except Exception as e:
+                    print(f"Startup: Win32 Style Error: {e}", flush=True)
+
+            print("Startup: StealthOverlay instance created successfully.", flush=True)
             print("Startup: Showing Overlay...", flush=True)
+            overlay.showNormal()
             overlay.show()
             print("Startup: Overlay show() called.", flush=True)
+            
+            overlay.setWindowOpacity(0.95)
+            print("Startup: Opacity set to 0.95", flush=True)
+            
             overlay.raise_()
+            print("Startup: Overlay raise() called.", flush=True)
+            
             overlay.activateWindow()
+            print("Startup: Overlay activateWindow() called.", flush=True)
+            
+            overlay.repaint()
+            print("Startup: Overlay repaint() called.", flush=True)
+            
+            print(f"Startup: Final Geometry: {overlay.geometry()}", flush=True)
             print("Startup: Overlay visible.", flush=True)
 
             # Keep console open for debugging
@@ -965,7 +1063,10 @@ def main():
             tray_icon.setToolTip("CareerCaster Stealth Agent")
             tray_icon.show()
             
-            sys.exit(app.exec())
+            print("Agent: Entering Event Loop...", flush=True)
+            exit_code = app.exec()
+            print(f"Agent: Event Loop Terminated with code {exit_code}.", flush=True)
+            sys.exit(exit_code)
         except Exception as e:
             # Re-raise to be caught by the outer try-except
             raise e
