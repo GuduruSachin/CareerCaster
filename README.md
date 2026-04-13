@@ -17,7 +17,6 @@ CareerCaster is a hybrid Python application designed to provide a real-time, ste
 
 ### 2. Install Dependencies
 ```bash
-pip uninstall google-generativeai -y
 pip install -r requirements.txt
 ```
 

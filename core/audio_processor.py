@@ -6,7 +6,7 @@ import base64
 import json
 import os
 import logging
-from logging.handlers import RotatingFileHandler
+import logging.handlers
 from core.paths import get_logs_dir
 
 # --- API Telemetry Logger Setup ---
@@ -16,7 +16,7 @@ api_logger.setLevel(logging.INFO)
 
 # Rotating handler: 2MB max, keep 5 backups
 if not api_logger.handlers:
-    handler = RotatingFileHandler(LOG_PATH, maxBytes=2*1024*1024, backupCount=5)
+    handler = logging.handlers.RotatingFileHandler(LOG_PATH, maxBytes=2*1024*1024, backupCount=5)
     formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     handler.setFormatter(formatter)
     api_logger.addHandler(handler)

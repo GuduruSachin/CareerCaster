@@ -10,7 +10,6 @@ import threading
 import time
 import io
 import multiprocessing
-import keyboard
 
 # --- Path Fix for Monorepo & PyInstaller ---
 # Add the correct root to sys.path so 'core' can be found
@@ -37,6 +36,10 @@ from core.paths import get_sessions_dir, get_assets_dir, secure_cleanup
 
 # --- Windows API Constants ---
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
+WM_HOTKEY = 0x0312
+MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
+HOTKEY_ID = 1
 
 class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
@@ -466,9 +469,31 @@ class StealthOverlay(QWidget):
         self.init_ui()
         self.apply_stealth_mode()
         self.start_audio_thread()
+        self.register_global_hotkey()
         
         # Persona Flash Label
         self.persona_flash = PersonaFlashLabel(self.container)
+
+    def register_global_hotkey(self):
+        """Registers the Ctrl+Shift+K global hotkey using Windows API."""
+        if sys.platform == "win32":
+            try:
+                hwnd = int(self.winId())
+                # Register Ctrl+Shift+K (K = 0x4B)
+                if not ctypes.windll.user32.RegisterHotKey(hwnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, 0x4B):
+                    print("Warning: Failed to register global Kill-Switch hotkey.")
+            except Exception as e:
+                print(f"Hotkey Registration Error: {e}")
+
+    def nativeEvent(self, eventType, message):
+        """Handles Windows native events, specifically the global hotkey."""
+        if sys.platform == "win32" and eventType == "windows_generic_MSG":
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_ID:
+                print("!!! GLOBAL KILL-SWITCH ACTIVATED !!!")
+                self.kill_process()
+                return True, 0
+        return super().nativeEvent(eventType, message)
 
     def apply_stealth_mode(self):
         """Hides the window from screen capture software (Zoom, Teams)."""
@@ -657,20 +682,18 @@ class StealthOverlay(QWidget):
         ))
 
     def kill_process(self):
-        """Gracefully kills the interview process."""
+        """Gracefully kills the interview process and wipes data."""
         try:
             self.update_status("● SHUTTING DOWN", "#FF5555")
             if self.audio_thread:
                 self.audio_thread.stop()
             
-            sessions_dir = get_sessions_dir()
-            session_path = os.path.join(sessions_dir, f"{self.session_id}.cc")
-            if os.path.exists(session_path):
-                os.remove(session_path)
+            from core.paths import secure_cleanup
+            secure_cleanup()
         except Exception as e:
             print(f"Shutdown Error: {e}")
         finally:
-            sys.exit(0)
+            os._exit(0)
 
     def start_audio_thread(self):
         if self.audio_thread:
@@ -870,18 +893,6 @@ def main():
             overlay = StealthOverlay(session_id, session_data)
             overlay.show()
 
-            # Global Kill-Switch: Ctrl+Shift+K
-            def kill_switch_handler():
-                print("!!! KILL-SWITCH ACTIVATED !!!")
-                # Terminate all child threads
-                if overlay.audio_thread:
-                    overlay.audio_thread.stop()
-                
-                secure_cleanup()
-                os._exit(0)
-            
-            keyboard.add_hotkey('ctrl+shift+k', kill_switch_handler)
-            
             tray_icon = QSystemTrayIcon(app)
             if os.path.exists(icon_path):
                 tray_icon.setIcon(QIcon(icon_path))
