@@ -6,9 +6,9 @@ CareerCaster operates as a **Hybrid Bridge** application. It leverages the acces
 ## The Web-to-Desktop Handshake
 1. **Data Ingestion**: The Streamlit Web Hub (`web_hub/app.py`) collects user data (Resume, JD, API Key).
 2. **AI Deep Analysis**: The Web Hub calls Gemini 1.5 Flash to generate a "Battle Plan" based on the Resume and JD.
-3. **Persistence**: Data and the AI Analysis are serialized into a JSON file in the `/sessions` directory, keyed by a unique UUID.
-4. **Trigger**: The Web Hub uses `subprocess.Popen` with `DETACHED_PROCESS` flags to launch the agent directly, with a fallback to the `careercaster://` protocol.
-5. **Agent Activation**: The Desktop Agent (`desktop_agent/main.py`) initializes using only the modern `google-genai` SDK.
+3. **Persistence**: Data and the AI Analysis are serialized into a JSON file in the `/sessions` directory, keyed by a unique UUID and encrypted as a `.cc` file.
+4. **Trigger**: The Web Hub uses `subprocess.Popen` with `DETACHED_PROCESS` flags to launch the agent directly, passing the UUID as a handshake.
+5. **Agent Activation**: The Desktop Agent (`desktop_agent/main.py`) initializes, decrypts the session, and prepares the WASAPI Loopback engine.
 
 ## Security Mechanism: AES-256 Encryption
 To protect sensitive user data (Resume, JD, API Keys) at rest, CareerCaster implements a local security layer:
@@ -39,13 +39,20 @@ CareerCaster uses a high-precision Voice Activity Detection (VAD) state machine 
 
 1. **State: IDLE**: The system monitors 30ms audio frames. If RMS energy exceeds a configurable threshold, it transitions to RECORDING.
 2. **State: RECORDING**: Audio frames are accumulated into a `BytesIO` buffer. If silence is detected, a counter begins.
-3. **State: PROCESSING**: If silence persists for >800ms, the buffer is finalized and sent to the Gemini API. The system then returns to IDLE.
+3. **State: PROCESSING**: If silence persists for >600ms, the buffer is finalized and sent to the Gemini API. The system then returns to IDLE.
 
-## Logging & Safety Layer
+## AI Reasoning: STAR & Predictor
+The system uses a structured JSON schema to support the segmented UI:
+- **Schema**: `{S, T, A, R, ProTip}` (Situation, Task, Action, Result, Follow-up Prediction).
+- **Humanized Hooks**: The prompt forces the AI to use 5-8 word "technical hooks" instead of paragraphs, defeating AI cadence detectors.
+- **Persona Toggle**: Ctrl+T shifts the system instructions between 'Strategic' and 'Deep Systems' focus.
+
+## Logging & Telemetry
 To protect users from unexpected costs and provide diagnostic transparency:
-- **Black Box Recorder**: Every API call is logged to `logs/api_history.jsonl` with timestamps, latency, and status codes.
+- **API Telemetry**: High-precision logging in `logs/api_performance.log` tracks latency and request status.
+- **Rotating Buffer**: Uses a `RotatingFileHandler` (2MB max) to prevent log bloat.
+- **Latency Warning**: Automatically flags requests taking >3s for performance auditing.
 - **Preview Mode**: A safety gatekeeper that allows users to verify hardware and VAD triggers without calling the Gemini API.
-- **Quota Tracking**: Explicitly captures 429 (Resource Exhausted) errors to help users manage their Free Tier limits.
 
 ## Data Flow Diagram
 ```text
@@ -63,5 +70,6 @@ To protect users from unexpected costs and provide diagnostic transparency:
 
 ## Security Considerations
 - **API Keys**: Stored locally in encrypted `.cc` session files.
+- **Nuclear Kill-Switch**: Pressing **Ctrl+Shift+K** triggers an immediate data wipe (sessions and logs), clears the clipboard, and terminates all threads.
 - **Session Cleanup**: The session file is automatically deleted when the ❌ Close button is clicked in the overlay.
 - **Registry**: Custom protocol requires write access to `HKEY_CURRENT_USER`.

@@ -4,6 +4,39 @@ import wave
 import io
 import base64
 import json
+import os
+import logging
+from logging.handlers import RotatingFileHandler
+from core.paths import get_logs_dir
+
+# --- API Telemetry Logger Setup ---
+LOG_PATH = os.path.join(get_logs_dir(), "api_performance.log")
+api_logger = logging.getLogger("api_telemetry")
+api_logger.setLevel(logging.INFO)
+
+# Rotating handler: 2MB max, keep 5 backups
+if not api_logger.handlers:
+    handler = RotatingFileHandler(LOG_PATH, maxBytes=2*1024*1024, backupCount=5)
+    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    api_logger.addHandler(handler)
+
+def log_api_telemetry(persona, char_count, latency, response_s, status):
+    """
+    Logs API interaction telemetry in a secure, structured format.
+    """
+    # Truncate response_s to 50 chars for the log
+    preview_s = (response_s[:50] + '...') if len(response_s) > 50 else response_s
+    preview_s = preview_s.replace('\n', ' ') # Sanitize for single-line log
+    
+    log_msg = f"[REQUEST] (Persona: {persona}, Context: {char_count} chars) "
+    log_msg += f"[RESPONSE] (Latency: {latency:.2f}s, S: \"{preview_s}\") "
+    log_msg += f"[STATUS] ({status})"
+    
+    if latency > 3.0:
+        log_msg += " [WARNING: HIGH_LATENCY]"
+        
+    api_logger.info(log_msg)
 
 class AudioProcessor:
     def __init__(self, chunk_size=1024):

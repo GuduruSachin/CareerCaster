@@ -52,6 +52,19 @@ def get_assets_dir():
     """
     return os.path.join(get_base_path(), "assets")
 
+def get_logs_dir():
+    """
+    Returns the path to the logs directory.
+    """
+    root = get_exe_dir()
+    logs_dir = os.path.join(root, "logs")
+    if not os.path.exists(logs_dir):
+        try:
+            os.makedirs(logs_dir)
+        except:
+            pass
+    return logs_dir
+
 def secure_cleanup():
     """
     Deletes all files in the sessions directory and clears clipboard for security.
@@ -70,6 +83,18 @@ def secure_cleanup():
                         os.unlink(file_path)
                 except Exception as e:
                     print(f"Failed to delete {file_path}: {e}")
-            print("Secure Cleanup: All session files deleted and clipboard cleared.")
+            
+        # Delete Log Files
+        logs_dir = get_logs_dir()
+        if os.path.exists(logs_dir):
+            for filename in os.listdir(logs_dir):
+                file_path = os.path.join(logs_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                except:
+                    pass
+                    
+        print("Secure Cleanup: All session files, logs deleted and clipboard cleared.")
     except Exception as e:
         print(f"Secure Cleanup Error: {e}")

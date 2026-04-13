@@ -31,10 +31,9 @@ from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QTimer, QRect
 from PyQt6.QtGui import QColor, QIcon, QAction, QFont, QPainter, QPixmap
 
 # Import modularized audio logic
-from core.audio_processor import AudioProcessor
+from core.audio_processor import AudioProcessor, log_api_telemetry
 from core.security import SecurityManager
 from core.paths import get_sessions_dir, get_assets_dir, secure_cleanup
-from core.logger import log_api_transaction
 
 # --- Windows API Constants ---
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
@@ -219,6 +218,7 @@ class AudioCaptureThread(QThread):
         try:
             self.is_ai_streaming = True
             prompt = self.processor.get_ai_prompt(self.session_data, persona=self.persona)
+            start_time = time.time()
             
             if self.preview_mode:
                 # Preview Mode: No API Cost
@@ -294,10 +294,12 @@ class AudioCaptureThread(QThread):
                 if p:
                     self.new_prediction.emit(p)
                 
-                log_api_transaction(
-                    model_used=self.active_model["name"],
-                    prompt_length=len(prompt),
-                    response_text=full_response,
+                latency = time.time() - start_time
+                log_api_telemetry(
+                    persona=self.persona,
+                    char_count=len(prompt),
+                    latency=latency,
+                    response_s=s,
                     status="SUCCESS"
                 )
             except json.JSONDecodeError:
@@ -305,10 +307,12 @@ class AudioCaptureThread(QThread):
                 if full_response:
                     self.new_chat_message.emit("advisor", full_response)
                 
-                log_api_transaction(
-                    model_used=self.active_model["name"],
-                    prompt_length=len(prompt),
-                    response_text=full_response,
+                latency = time.time() - start_time
+                log_api_telemetry(
+                    persona=self.persona,
+                    char_count=len(prompt),
+                    latency=latency,
+                    response_s=full_response[:50],
                     status="PARSE_ERROR"
                 )
             finally:
@@ -318,6 +322,15 @@ class AudioCaptureThread(QThread):
             self.is_ai_streaming = False
             err_msg = str(e)
             print(f"AI Processing Error: {err_msg}")
+            
+            latency = time.time() - (start_time if 'start_time' in locals() else time.time())
+            log_api_telemetry(
+                persona=self.persona,
+                char_count=len(prompt) if 'prompt' in locals() else 0,
+                latency=latency,
+                response_s="N/A",
+                status=f"ERROR: {err_msg[:50]}"
+            )
 
     def stop(self):
         self.is_running = False
@@ -359,7 +372,7 @@ class ChatBubble(QFrame):
                     reconstructed.append(self.segments[i] + " " + seg_content)
             self.segments = reconstructed
             if self.segments:
-                display_text = self.segments[0] + " *(Space to advance)*"
+                display_text = self.segments[0] + " *(Right Arrow to advance)*"
             else:
                 display_text = text
         else:
@@ -406,7 +419,7 @@ class ChatBubble(QFrame):
             self.current_segment_idx += 1
             current_display = " ".join(self.segments[:self.current_segment_idx + 1])
             if self.current_segment_idx < len(self.segments) - 1:
-                current_display += " *(Press Space to advance)*"
+                current_display += " *(Right Arrow to advance)*"
             self.label.setText(highlight_keywords(current_display))
             return True
         return False
@@ -795,88 +808,105 @@ def main():
             QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
         # Windows Taskbar Branding
-    if sys.platform == "win32":
-        try:
-            myappid = 'careercaster.stealth.agent.v1'
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        except Exception as e:
-            print(f"Branding Error: {e}")
+        if sys.platform == "win32":
+            try:
+                myappid = 'careercaster.stealth.agent.v1'
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+            except Exception as e:
+                print(f"Branding Error: {e}")
 
-    app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)
-    
-    # Set Application Icon
-    assets_dir = get_assets_dir()
-    icon_path = os.path.join(assets_dir, "logo.ico")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
-    
-    # Handshake: Capture session_id from arguments
-    session_id = sys.argv[1] if len(sys.argv) > 1 else None
-    
-    if not session_id:
-        print("Error: No session ID detected.")
-        from PyQt6.QtWidgets import QMessageBox
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Critical)
-        msg.setText("CareerCaster Launch Error")
-        msg.setInformativeText("No session ID detected. Please launch the agent from the Web Hub.")
-        msg.setWindowTitle("Error")
-        msg.exec()
-        sys.exit(1)
+        app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)
         
-    sessions_dir = get_sessions_dir()
-    session_path = os.path.join(sessions_dir, f"{session_id}.cc")
-    print(f"Startup: Looking for session at {session_path}")
-    
-    try:
-        if not os.path.exists(session_path):
-            error_msg = f"Session data not found.\n\nExpected at: {session_path}"
-            raise FileNotFoundError(error_msg)
-            
-        security = SecurityManager()
-        with open(session_path, 'rb') as f:
-            encrypted_data = f.read()
-            decrypted_json = security.decrypt_data(encrypted_data)
-            session_data = json.loads(decrypted_json)
-            
-        overlay = StealthOverlay(session_id, session_data)
-        overlay.show()
-
-        # Global Kill-Switch: Ctrl+Shift+K
-        def kill_switch_handler():
-            print("!!! KILL-SWITCH ACTIVATED !!!")
-            # Terminate all child threads
-            if overlay.audio_thread:
-                overlay.audio_thread.stop()
-            
-            secure_cleanup()
-            os._exit(0)
-        
-        keyboard.add_hotkey('ctrl+shift+k', kill_switch_handler)
-        
-        tray_icon = QSystemTrayIcon(app)
+        # Set Application Icon
+        assets_dir = get_assets_dir()
+        icon_path = os.path.join(assets_dir, "logo.ico")
         if os.path.exists(icon_path):
-            tray_icon.setIcon(QIcon(icon_path))
-        else:
-            tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
+            app.setWindowIcon(QIcon(icon_path))
         
-        tray_menu = QMenu()
-        restore_action = QAction("Restore Overlay", tray_menu)
-        restore_action.triggered.connect(lambda: (overlay.show(), overlay.raise_(), overlay.activateWindow()))
-        tray_menu.addAction(restore_action)
+        # Handshake: Capture session_id from arguments
+        raw_arg = sys.argv[1] if len(sys.argv) > 1 else None
+        session_id = None
         
-        tray_menu.addSeparator()
+        if raw_arg:
+            if "careercaster://" in raw_arg:
+                # Parse URI: careercaster://start?session_id=UUID
+                try:
+                    parsed = urllib.parse.urlparse(raw_arg)
+                    params = urllib.parse.parse_qs(parsed.query)
+                    session_id = params.get("session_id", [None])[0]
+                except Exception as e:
+                    print(f"URI Parse Error: {e}")
+            else:
+                # Direct UUID
+                session_id = raw_arg
         
-        exit_action = QAction("Exit CareerCaster", tray_menu)
-        exit_action.triggered.connect(app.quit)
-        tray_menu.addAction(exit_action)
-        
-        tray_icon.setContextMenu(tray_menu)
-        tray_icon.setToolTip("CareerCaster Stealth Agent")
-        tray_icon.show()
-        
-        sys.exit(app.exec())
+        if not session_id:
+            print("Error: No session ID detected.")
+            from PyQt6.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Critical)
+            msg.setText("CareerCaster Launch Error")
+            msg.setInformativeText("No session ID detected. Please launch the agent from the Web Hub.")
+            msg.setWindowTitle("Error")
+            msg.exec()
+            sys.exit(1)
+            
+        sessions_dir = get_sessions_dir()
+        session_path = os.path.join(sessions_dir, f"{session_id}.cc")
+        print(f"Startup: Looking for session at {session_path}")
+    
+        try:
+            if not os.path.exists(session_path):
+                error_msg = f"Session data not found.\n\nExpected at: {session_path}"
+                raise FileNotFoundError(error_msg)
+                
+            security = SecurityManager()
+            with open(session_path, 'rb') as f:
+                encrypted_data = f.read()
+                decrypted_json = security.decrypt_data(encrypted_data)
+                session_data = json.loads(decrypted_json)
+                
+            overlay = StealthOverlay(session_id, session_data)
+            overlay.show()
+
+            # Global Kill-Switch: Ctrl+Shift+K
+            def kill_switch_handler():
+                print("!!! KILL-SWITCH ACTIVATED !!!")
+                # Terminate all child threads
+                if overlay.audio_thread:
+                    overlay.audio_thread.stop()
+                
+                secure_cleanup()
+                os._exit(0)
+            
+            keyboard.add_hotkey('ctrl+shift+k', kill_switch_handler)
+            
+            tray_icon = QSystemTrayIcon(app)
+            if os.path.exists(icon_path):
+                tray_icon.setIcon(QIcon(icon_path))
+            else:
+                tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
+            
+            tray_menu = QMenu()
+            restore_action = QAction("Restore Overlay", tray_menu)
+            restore_action.triggered.connect(lambda: (overlay.show(), overlay.raise_(), overlay.activateWindow()))
+            tray_menu.addAction(restore_action)
+            
+            tray_menu.addSeparator()
+            
+            exit_action = QAction("Exit CareerCaster", tray_menu)
+            exit_action.triggered.connect(app.quit)
+            tray_menu.addAction(exit_action)
+            
+            tray_icon.setContextMenu(tray_menu)
+            tray_icon.setToolTip("CareerCaster Stealth Agent")
+            tray_icon.show()
+            
+            sys.exit(app.exec())
+        except Exception as e:
+            # Re-raise to be caught by the outer try-except
+            raise e
     except Exception as e:
         # Global Error Resilience: Log to crash.log
         import traceback

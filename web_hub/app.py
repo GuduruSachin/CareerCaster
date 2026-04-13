@@ -298,8 +298,8 @@ if st.session_state.saved and st.session_state.session_id:
                 # Fallback to Python script for development
                 agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
                 python_exe = sys.executable.replace("python.exe", "pythonw.exe")
-                # For the script, we pass the full URI as it's the expected format for dev testing
-                subprocess.Popen([python_exe, agent_path, uri], 
+                # Pass raw session_id directly to the script as well
+                subprocess.Popen([python_exe, agent_path, session_id], 
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.warning("EXE not found. Launched raw Python script instead.")
         except Exception as e:

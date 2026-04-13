@@ -36,6 +36,12 @@
 - [x] Implement Stealth Answer Logic (Brevity & Bold keywords).
 - [x] Implement API Black Box Recorder (JSONL Logging).
 - [x] Implement Preview Mode (Safety Gatekeeper).
+- [x] Implement STAR Segmented UI with Right Arrow advancement.
+- [x] Implement Follow-up Predictor (Pro-Tip box).
+- [x] Implement Persona Toggle (Ctrl+T) with UI flash feedback.
+- [x] Implement API Diagnostics & Telemetry (Rotating 2MB logs).
+- [x] Implement Nuclear Kill-Switch (Ctrl+Shift+K) with clipboard/log wipe.
+- [x] Implement Input Isolation (Active window check).
 
 ## Technical Debt
 - [ ] Refactor path resolution to use absolute project root.
