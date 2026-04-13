@@ -17,20 +17,32 @@ class AudioProcessor:
         """
         Tests common sample rates and returns the first one compatible with the hardware.
         """
-        rates = [16000, 44100, 48000]
+        rates = [44100, 48000, 16000, 22050, 32000]
         device_index = self.find_wasapi_loopback_device()
         
         for rate in rates:
             try:
+                # First check if format is supported
                 if self.pa.is_format_supported(
                     rate=rate,
                     input_device=device_index,
                     input_channels=self.channels,
                     input_format=self.format
                 ):
-                    print(f"Auto-detected compatible sample rate: {rate}Hz")
+                    # Robust Check: Try to actually open the stream to avoid [Errno -9997]
+                    test_stream = self.pa.open(
+                        format=self.format,
+                        channels=self.channels,
+                        rate=rate,
+                        input=True,
+                        input_device_index=device_index,
+                        frames_per_buffer=1024
+                    )
+                    test_stream.close()
+                    print(f"Verified compatible sample rate: {rate}Hz")
                     return rate
-            except Exception:
+            except Exception as e:
+                print(f"Sample rate {rate}Hz not supported: {e}")
                 continue
         
         print("Warning: No standard sample rate verified. Defaulting to 16000Hz.")
@@ -105,21 +117,74 @@ class AudioProcessor:
         # Normalize to 0.0 - 1.0 range (approximate for int16)
         return rms / 32768.0
 
-    def get_ai_prompt(self, context_tags):
+    def get_ai_prompt(self, session_data, persona="Strategic Leadership"):
         """
-        Returns the refined AI prompt for interview assistance.
+        Returns the refined AI prompt for Anti-AI Detection Mode.
         """
+        resume = session_data.get("resume_text", "")[:4000]
+        notes = session_data.get("project_notes", "")[:2000]
+        jd = session_data.get("jd_text", "")[:2000]
+        tags = session_data.get("context_tags", {})
+
+        persona_guide = ""
+        if persona == "Strategic Leadership":
+            persona_guide = "Focus on trade-offs, ROI, stakeholder management, and high-level architectural 'Why.' Use 'Human Pivots' like 'The real headache was...' or 'What actually moved the needle was...'"
+        else:
+            persona_guide = "Focus on the 'How.' Mention specific libraries (OpenCV), protocols (WASAPI), and low-level hurdles (UUID hardware-locking). Use 'Human Pivots' like 'To be fair, we considered...' or 'If I did it again, I'd probably...'"
+
         return f"""
-        You are an interview assistant. Listen to this 4-second audio clip.
-        Context Tags: {json.dumps(context_tags)}
-        
-        CRITICAL INSTRUCTIONS:
-        1. Ignore the interviewee (Umesh). Only transcribe and answer questions asked by the interviewer.
-        2. If you hear a question, return a JSON object: {{"question": "...", "answer": "..."}}
-        3. The 'answer' MUST be under 20 words.
-        4. Use **BOLD** for technical keywords in the answer.
-        5. If no question is heard, return an empty string.
+        ROLE: Senior Architect Mentor (Anti-AI Detection Mode)
+        GOAL: Act as a strategic memory-assistant. Provide exactly ONE response per turn.
+        {persona_guide}
+
+        1. THE 'HOOK' SYSTEM:
+        - Do NOT write full, polished paragraphs.
+        - Write in 'Speaker Notes' style: 5-8 word technical 'hooks' or bullet points.
+        - This forces the user to bridge the gaps with their own voice.
+
+        2. HUMANIZED LINGUISTICS:
+        - Strictly forbid 'robot' transitions: (Firstly, Moreover, In conclusion, Furthermore).
+        - Use 'Human Pivots'.
+
+        CANDIDATE CONTEXT:
+        - RESUME: {resume}
+        - PROJECT NOTES: {notes}
+        - JOB DESCRIPTION: {jd}
+        - FOCUS TAGS: {json.dumps(tags)}
+
+        DECISION LOGIC:
+        1. **Scenario-Based/Experience Questions**: Use STAR segments.
+        2. **Technical/Conceptual Questions**: Put the entire answer in 'S' and leave others empty.
+
+        OUTPUT FORMAT:
+        Return JSON with keys: 'S', 'T', 'A', 'R', 'ProTip'.
+        'ProTip' is a 10-word prediction of the next technical follow-up.
+
+        EXAMPLE JSON:
+        {{
+          "S": "Legacy monolith scaling bottleneck",
+          "T": "Reduce DB contention",
+          "A": "Redis caching + Query optimization",
+          "R": "50% latency drop",
+          "ProTip": "They will ask about cache invalidation strategies next."
+        }}
         """
+
+    def recover_stream(self):
+        """
+        Attempts to re-initialize the PyAudio instance and find the loopback device.
+        Used when the stream hits an exception (e.g., device disconnected).
+        """
+        try:
+            self.pa.terminate()
+            import time
+            time.sleep(2)
+            self.pa = pyaudio.PyAudio()
+            self.rate = self._detect_best_sample_rate()
+            return True
+        except Exception as e:
+            print(f"Stream Recovery Failed: {e}")
+            return False
 
     def close(self):
         self.pa.terminate()

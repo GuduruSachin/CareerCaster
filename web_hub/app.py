@@ -109,9 +109,10 @@ with st.sidebar:
                 success_models = [r for r in results if r["status"] == "Success"]
                 if success_models:
                     st.session_state.api_verified = True
-                    success_models.sort(key=lambda x: x["latency"])
+                    # Prioritize 'flash' models, then sort by latency
+                    success_models.sort(key=lambda x: (0 if "flash" in x["name"].lower() else 1, x["latency"]))
                     st.session_state.active_model = success_models[0]
-                    st.success(f"Verified! Fastest: {success_models[0]['name']}")
+                    st.success(f"Verified! Recommended (Fastest Flash): {success_models[0]['name']}")
                 else:
                     st.session_state.api_verified = False
                     st.error("Verification failed. Check API Key.")
@@ -119,7 +120,8 @@ with st.sidebar:
     # Dynamic Advanced Settings
     if st.session_state.api_verified:
         success_models = [r for r in st.session_state.scan_results if r["status"] == "Success"]
-        success_models.sort(key=lambda x: x["latency"])
+        # Prioritize 'flash' models, then sort by latency
+        success_models.sort(key=lambda x: (0 if "flash" in x["name"].lower() else 1, x["latency"]))
         model_options = [f"{m['name']} ({m['latency']}s)" for m in success_models]
         
         with st.expander("⚙️ Advanced Settings"):
@@ -158,7 +160,10 @@ if resume_file:
                 show_text_dialog(st.session_state.resume_text)
 
 # Job Description Text Area
-jd_text = st.text_area("Paste Job Description (JD)", height=250, placeholder="Paste the full job description here...")
+jd_text = st.text_area("Paste Job Description (JD)", height=200, placeholder="Paste the full job description here...")
+
+# Project Notes (RAG Context)
+project_notes = st.text_area("Project Notes / Key Achievements", height=150, placeholder="Add specific project details, metrics, or notes you want the AI to use for STAR answers...")
 
 # --- Handshake Logic ---
 can_prepare = st.session_state.api_verified and resume_file and jd_text
@@ -214,6 +219,7 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             "api_key": api_key,
             "resume_text": resume_text,
             "jd_text": jd_text,
+            "project_notes": project_notes,
             "session_id": session_id,
             "analysis": analysis,
             "context_tags": context_tags,
@@ -224,15 +230,46 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
         security = SecurityManager()
         encrypted_data = security.encrypt_data(json.dumps(session_data))
         
+        # Primary Save (Root sessions folder for development)
         file_path = os.path.join(SESSIONS_DIR, f"{session_id}.cc")
         with open(file_path, "wb") as f:
             f.write(encrypted_data)
+            
+        # Secondary Save (EXE sessions folder for compiled builds)
+        # This ensures the standalone EXE can find the session regardless of launch context
+        exe_dist_dir = os.path.join(PROJECT_ROOT, "dist", "CareerCaster")
+        exe_sessions_dir = os.path.join(exe_dist_dir, "sessions")
+        
+        # Proactively create the directory structure if the dist folder exists
+        if os.path.exists(exe_dist_dir):
+            os.makedirs(exe_sessions_dir, exist_ok=True)
+            
+            exe_file_path = os.path.join(exe_sessions_dir, f"{session_id}.cc")
+            try:
+                with open(exe_file_path, "wb") as f:
+                    f.write(encrypted_data)
+                print(f"Sync: Session saved to EXE path: {exe_file_path}")
+            except Exception as e:
+                st.warning(f"Failed to sync session to EXE folder: {e}")
+        else:
+            print(f"Sync: EXE dist folder not found at {exe_dist_dir}. Skipping sync.")
         
         st.session_state.saved = True
         st.success(f"Session {session_id} prepared and ENCRYPTED!")
         
     except Exception as e:
         st.error(f"Error preparing session: {e}")
+
+def terminate_existing_agent():
+    """Checks for existing CareerCaster.exe processes and terminates them."""
+    if sys.platform == "win32":
+        try:
+            # Taskkill returns 0 on success, 128 if process not found
+            subprocess.run(["taskkill", "/F", "/IM", "CareerCaster.exe", "/T"], 
+                           capture_output=True, check=False)
+            print("Pre-flight: Existing CareerCaster processes terminated.")
+        except Exception as e:
+            print(f"Pre-flight Error: {e}")
 
 # --- Trigger Mechanism ---
 # Only active/visible after the session JSON has been successfully saved
@@ -241,6 +278,9 @@ if st.session_state.saved and st.session_state.session_id:
     st.subheader("🚀 Step 2: Launch Protocol")
     
     if st.button("🔥 START INTERVIEW", type="primary"):
+        # Pre-flight check
+        terminate_existing_agent()
+        
         session_id = st.session_state.session_id
         uri = f"careercaster://start?session_id={session_id}"
         
@@ -250,10 +290,9 @@ if st.session_state.saved and st.session_state.session_id:
         try:
             if os.path.exists(exe_path):
                 # Launch the compiled EXE with raw session_id as direct argument
-                # shell=False (default) ensures arguments are passed correctly as a list
+                # Using CREATE_NEW_CONSOLE as requested for robust Windows handshake
                 subprocess.Popen([exe_path, session_id], 
-                                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-                                 shell=False)
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.success("Stealth Agent (EXE) launched!")
             else:
                 # Fallback to Python script for development
@@ -261,8 +300,7 @@ if st.session_state.saved and st.session_state.session_id:
                 python_exe = sys.executable.replace("python.exe", "pythonw.exe")
                 # For the script, we pass the full URI as it's the expected format for dev testing
                 subprocess.Popen([python_exe, agent_path, uri], 
-                                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-                                 shell=False)
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE)
                 st.warning("EXE not found. Launched raw Python script instead.")
         except Exception as e:
             st.error(f"Failed to launch agent directly: {e}")

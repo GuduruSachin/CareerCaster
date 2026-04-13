@@ -1,26 +1,33 @@
 import os
 import sys
 
-def get_project_root():
+def get_base_path():
     """
-    Returns the root directory of the project.
-    Handles both 'frozen' (PyInstaller EXE) and 'unfrozen' (Python script) states.
+    Returns the base path for resources.
+    Uses sys._MEIPASS when frozen (PyInstaller) to access bundled assets.
+    Falls back to the project root in development.
+    """
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return sys._MEIPASS
+    
+    # In development, this file is in core/, so the root is one level up
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def get_exe_dir():
+    """
+    Returns the directory where the EXE (or script) is located.
+    This is used for persistent data like sessions.
     """
     if getattr(sys, 'frozen', False):
-        # Running as a bundled EXE
-        # sys.executable is the path to the EXE
         return os.path.dirname(sys.executable)
-    else:
-        # Running as a script
-        # This file is in core/, so the root is one level up
-        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return get_base_path()
 
 def get_sessions_dir():
     """
     Returns the path to the sessions directory.
-    Creates it if it doesn't exist.
+    Sessions should be relative to the EXE to persist across runs.
     """
-    root = get_project_root()
+    root = get_exe_dir()
     sessions_dir = os.path.join(root, "sessions")
     
     if not os.path.exists(sessions_dir):
@@ -37,3 +44,32 @@ def get_sessions_dir():
                 raise e
                 
     return sessions_dir
+
+def get_assets_dir():
+    """
+    Returns the path to the assets directory.
+    Assets are bundled inside the EXE, so we use the base path (sys._MEIPASS).
+    """
+    return os.path.join(get_base_path(), "assets")
+
+def secure_cleanup():
+    """
+    Deletes all files in the sessions directory and clears clipboard for security.
+    """
+    try:
+        # Clear Clipboard
+        if sys.platform == 'win32':
+            os.system('cmd /c "echo off | clip"')
+        
+        sessions_dir = get_sessions_dir()
+        if os.path.exists(sessions_dir):
+            for filename in os.listdir(sessions_dir):
+                file_path = os.path.join(sessions_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}: {e}")
+            print("Secure Cleanup: All session files deleted and clipboard cleared.")
+    except Exception as e:
+        print(f"Secure Cleanup Error: {e}")
