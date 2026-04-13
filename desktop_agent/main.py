@@ -48,6 +48,10 @@ WS_EX_LAYERED = 0x00080000
 # Global Instance Protection: Prevents Garbage Collector from deleting windows
 _PERSISTENT_WINDOWS = []
 
+# NUCLEAR PERSISTENCE: Global scope anchoring
+app = None
+overlay = None
+
 class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
     new_prediction = pyqtSignal(str) # prediction text
@@ -493,11 +497,11 @@ class StealthOverlay(QWidget):
         else:
             print("Overlay: Stealth Mode disabled by user.", flush=True)
         
-        print("Overlay: Starting Audio Thread...", flush=True)
-        self.start_audio_thread()
+        # DELAYED START: Move audio thread and hotkey to timers to ensure event loop is running
+        print("Overlay: Scheduling Audio Thread start (2s)...", flush=True)
+        QTimer.singleShot(2000, self.start_audio_thread)
         
-        # Move Hotkey Registration to a timer to ensure window is fully realized
-        print("Overlay: Scheduling Global Hotkey...", flush=True)
+        print("Overlay: Scheduling Global Hotkey (1s)...", flush=True)
         QTimer.singleShot(1000, self.register_global_hotkey)
         
         # Persona Flash Label
@@ -583,17 +587,17 @@ class StealthOverlay(QWidget):
             print("Stealth Mode: Not on Windows, skipping.", flush=True)
 
     def init_ui(self):
-        print("Overlay: Initializing UI Layout (DIAGNOSTIC MODE)...", flush=True)
-        # DIAGNOSTIC: Standard window with title bar and borders
+        print("Overlay: Initializing UI Layout (NUCLEAR PERSISTENCE MODE)...", flush=True)
+        # NUCLEAR PERSISTENCE: Standard window with title bar and borders
         self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint | 
-            Qt.WindowType.Tool
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowStaysOnTopHint
         )
-        # DIAGNOSTIC: Disable transparency
-        # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        # NUCLEAR PERSISTENCE: Disable all transparency/stealth attributes
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         
-        # DIAGNOSTIC: Solid Red Background for visibility
-        self.setStyleSheet("background-color: #FF0000; border: 5px solid white;")
+        # NUCLEAR PERSISTENCE: Solid Gray Background for visibility
+        self.setStyleSheet("background-color: #222222; border: 2px solid #00AAFF;")
         
         # Set Window Icon
         icon_path = os.path.join(get_assets_dir(), "logo.ico")
@@ -916,6 +920,7 @@ class StealthOverlay(QWidget):
         event.accept()
 
 def main():
+    global app, overlay
     # Critical for PyInstaller + Multiprocessing on Windows
     if sys.platform == "win32":
         multiprocessing.freeze_support()
@@ -1025,25 +1030,35 @@ def main():
             """
 
             print("Startup: StealthOverlay instance created successfully.", flush=True)
-            print("Startup: Showing Overlay...", flush=True)
-            overlay.showNormal()
-            overlay.show()
-            print("Startup: Overlay show() called.", flush=True)
             
-            overlay.setWindowOpacity(0.95)
-            print("Startup: Opacity set to 0.95", flush=True)
-            
-            overlay.raise_()
-            print("Startup: Overlay raise() called.", flush=True)
-            
-            overlay.activateWindow()
-            print("Startup: Overlay activateWindow() called.", flush=True)
-            
-            overlay.repaint()
-            print("Startup: Overlay repaint() called.", flush=True)
+            print("Startup: Calling overlay.show()...", flush=True)
+            try:
+                overlay.showNormal()
+                overlay.show()
+                print("Startup: overlay.show() returned.", flush=True)
+                
+                overlay.setWindowOpacity(0.95)
+                print("Startup: Opacity set to 0.95", flush=True)
+                
+                overlay.raise_()
+                print("Startup: overlay.raise_() called.", flush=True)
+                
+                overlay.activateWindow()
+                print("Startup: overlay.activateWindow() called.", flush=True)
+                
+                overlay.repaint()
+                print("Startup: overlay.repaint() called.", flush=True)
+            except Exception as e_show:
+                print(f"Startup: CRITICAL ERROR during overlay.show(): {e_show}", flush=True)
+                raise e_show
             
             print(f"Startup: Final Geometry: {overlay.geometry()}", flush=True)
             print("Startup: Overlay visible.", flush=True)
+            
+            # NUCLEAR PERSISTENCE: Force native event processing
+            print("Startup: Forcing native event processing...", flush=True)
+            app.processEvents()
+            print("AGENT_ALIVE_MARKER", flush=True)
 
             # Keep console open for debugging
             print("\n" + "="*50, flush=True)
@@ -1051,26 +1066,30 @@ def main():
             print("Minimize this window, but do NOT close it.", flush=True)
             print("="*50 + "\n", flush=True)
 
-            tray_icon = QSystemTrayIcon(app)
-            if os.path.exists(icon_path):
-                tray_icon.setIcon(QIcon(icon_path))
-            else:
-                tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
-            
-            tray_menu = QMenu()
-            restore_action = QAction("Restore Overlay", tray_menu)
-            restore_action.triggered.connect(lambda: (overlay.show(), overlay.raise_(), overlay.activateWindow()))
-            tray_menu.addAction(restore_action)
-            
-            tray_menu.addSeparator()
-            
-            exit_action = QAction("Exit CareerCaster", tray_menu)
-            exit_action.triggered.connect(app.quit)
-            tray_menu.addAction(exit_action)
-            
-            tray_icon.setContextMenu(tray_menu)
-            tray_icon.setToolTip("CareerCaster Stealth Agent")
-            tray_icon.show()
+            try:
+                tray_icon = QSystemTrayIcon(app)
+                if os.path.exists(icon_path):
+                    tray_icon.setIcon(QIcon(icon_path))
+                else:
+                    tray_icon.setIcon(app.style().standardIcon(app.style().StandardPixmap.SP_ComputerIcon))
+                
+                tray_menu = QMenu()
+                restore_action = QAction("Restore Overlay", tray_menu)
+                restore_action.triggered.connect(lambda: (overlay.show(), overlay.raise_(), overlay.activateWindow()))
+                tray_menu.addAction(restore_action)
+                
+                tray_menu.addSeparator()
+                
+                exit_action = QAction("Exit CareerCaster", tray_menu)
+                exit_action.triggered.connect(app.quit)
+                tray_menu.addAction(exit_action)
+                
+                tray_icon.setContextMenu(tray_menu)
+                tray_icon.setToolTip("CareerCaster Stealth Agent")
+                tray_icon.show()
+                print("Startup: Tray Icon initialized and shown.", flush=True)
+            except Exception as e_tray:
+                print(f"Startup: Warning - Tray Icon failed to initialize: {e_tray}", flush=True)
             
             print("Startup: Entering Event Loop...", flush=True)
             try:
@@ -1134,6 +1153,6 @@ print("DIAGNOSTIC: Script reached end of file.", flush=True)
 print("If you see this, the process terminated unexpectedly.", flush=True)
 print("!"*50 + "\n", flush=True)
 try:
-    input("CRITICAL: Script reached end of file. Press Enter to exit...")
+    input("DEBUG: Process reached end of file. Press Enter to close...")
 except EOFError:
     pass
