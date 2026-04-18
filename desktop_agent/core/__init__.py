@@ -1,1 +1,1 @@
-# CareerCaster Core Package
+# CareerCaster Agent Core Library

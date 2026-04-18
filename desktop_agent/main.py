@@ -18,17 +18,24 @@ HEARTBEAT_COUNT = 0
 
 # --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(ROOT_DIR)
 
+# Priority 1: Project Root (for shared /core security/paths)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# Priority 0: Agent Root (for /core ai_engine and /ui overlay)
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
+
+import json
+from core.security import SecurityManager
+from core.paths import get_logs_dir
 
 # --- FILE-BASED LOGGING SYSTEM ---
 def setup_logging():
     global LOGGER
-    # Use absolute path for logs directory
-    logs_dir = os.path.join(ROOT_DIR, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    
+    logs_dir = get_logs_dir()
     log_file = os.path.join(logs_dir, "session.log")
     
     LOGGER = logging.getLogger("CareerCaster")
@@ -46,15 +53,7 @@ def setup_logging():
     LOGGER.addHandler(sh)
     return LOGGER
 
-# --- SECURITY MOCK FOR MODULATED TESTING ---
-try:
-    from core.security import SecurityManager
-except ImportError:
-    class SecurityManager:
-        @staticmethod
-        def get_hardware_id(): return "MODULAR-HWID-MOCK"
-        @staticmethod
-        def decrypt_session(p, k): return {"id": "SESS-MODULAR", "project": "CareerCaster Modular"}
+# --- SECURITY REMOVED MOCK (USING REAL CORE) ---
 
 def run_heartbeat():
     global HEARTBEAT_COUNT
@@ -67,41 +66,65 @@ def initialize_refined_skeleton():
 
     LOGGER = setup_logging()
 
-    LOGGER.info("[STEP 1/5] MUTEX: Checking for existing instances...")
+    # Singleton instance check
     MUTEX_LOCK = QSharedMemory("CareerCaster_Unique_Lock")
     if not MUTEX_LOCK.create(1):
         if MUTEX_LOCK.attach():
-            LOGGER.error("[CRITICAL] Mutex Check: Another instance detected. Exiting.")
+            LOGGER.error("Another instance of CareerCaster is already running. Exiting.")
             sys.exit(0)
 
-    LOGGER.info("[STEP 2/5] ENGINE: Initializing QApplication and event loop...")
+    # Core Engine Setup
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     APPLICATION_INSTANCE = QApplication(sys.argv)
     
-    LOGGER.info("[STEP 3/5] SECURITY: Syncing Hardware ID and session encryption...")
-    decrypted_data = None
+    # Session & Security Synchronization
+    decrypted_data = {}
+    auth_error = None
     try:
-        hw_id = SecurityManager.get_hardware_id()
+        security = SecurityManager()
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
             session_path = sys.argv[1]
-            # In a real environment, decrypt_session would load the JSON from user's dashboard
-            decrypted_data = SecurityManager.decrypt_session(session_path, hw_id)
-            LOGGER.info(f"Session Sync: Loaded {decrypted_data.get('id')} with model {decrypted_data.get('active_model', {}).get('name')}")
+            if os.path.exists(session_path):
+                with open(session_path, "rb") as f:
+                    encrypted_data = f.read()
+                
+                try:
+                    raw_json = security.decrypt_data(encrypted_data)
+                    decrypted_data = json.loads(raw_json)
+                    
+                    sess_id = decrypted_data.get('session_id', 'Unknown')
+                    model = decrypted_data.get('active_model', {}).get('name', 'N/A')
+                    LOGGER.info(f"Session Sync Success: {sess_id} | Model: {model}")
+                except Exception as de:
+                    auth_error = f"Authentication Error: {de}"
+                    LOGGER.error(auth_error)
+            else:
+                auth_error = "Session file missing."
+                LOGGER.warning(auth_error)
     except Exception as e:
-        LOGGER.warning(f"Security Sync Failed: {e}")
+        auth_error = f"Security initialization failed: {e}"
+        LOGGER.error(auth_error)
 
-    # Requirement 2: Entry point passing verified API key and Model name to Overlay
-    LOGGER.info("[STEP 4/5] INTERFACE: Constructing Modular Assistant UI...")
+    # Fallback to diagnostic state if sync fails
+    if not decrypted_data:
+        decrypted_data = {
+            "id": "DIAG-1.1", 
+            "preview_mode": True if auth_error else False, 
+            "test_mode": True,
+            "project": "CareerCaster Agent"
+        }
+
+    # UI Construction
     MAIN_OVERLAY = StealthOverlay(session_data=decrypted_data)
     
-    LOGGER.info("[STEP 5/5] WATCHDOG: Diagnostic heartbeat active.")
+    if auth_error:
+        MAIN_OVERLAY.inject_message(f"SECURITY ALERT: {auth_error}. Operating in Limited Mode.", sender="SYSTEM")
+    
+    # Heartbeat Watchdog
     DIAGNOSTIC_TIMER = QTimer()
     DIAGNOSTIC_TIMER.timeout.connect(run_heartbeat)
     DIAGNOSTIC_TIMER.start(5000)
 
-    if MAIN_OVERLAY.test_mode_active:
-        MAIN_OVERLAY.inject_message("Modular Refactor complete. Dynamic AI Sync active.", sender="SYSTEM")
-    
     MAIN_OVERLAY.show()
     
     exit_code = APPLICATION_INSTANCE.exec()

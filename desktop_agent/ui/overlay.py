@@ -24,17 +24,16 @@ class StealthOverlay(QMainWindow):
         self.session_data = session_data or {}
         self.api_key = self.session_data.get("api_key")
         
-        # Requirement 2: Dynamic Model Sync
-        # Using selected_model from dashboard session if available
+        # Dashboard Sync: Dynamic Session Properties
         active_model_info = self.session_data.get("active_model", {})
         self.model_name = active_model_info.get("name", "gemini-3-flash-preview")
         
-        # State Initialization
-        self.preview_mode_active = self.session_data.get("preview_mode", True)
-        self.stealth_mode_active = not self.session_data.get("disable_stealth", False)
-        self.test_mode_active = True
+        # State Management: Prioritize explicit session flags
+        self.preview_mode_active = self.session_data.get("preview_mode", False)
+        self.stealth_mode_active = self.session_data.get("stealth_mode", True)
+        self.test_mode_active = self.session_data.get("test_mode", False)
         
-        # Requirement 5: Static Stealth (0.85 opacity)
+        # UI Attributes & Performance Settings
         opacity = 0.85 if self.stealth_mode_active else 1.0
         self.setWindowOpacity(opacity)
         self.setMinimumSize(400, 500)
@@ -190,12 +189,21 @@ class StealthOverlay(QMainWindow):
         self.mock_input.clear()
         self.inject_message(query, sender="USER")
         
+        # Requirement 1: Only mock if Preview Mode is explicitly True
         if self.preview_mode_active:
             self.inject_message("PREVIEW MODE: (AI Query Mocked) " + query, sender="SYSTEM")
             return
 
+        # LIVE ENGINE TRIGGER
+        # Verify API key before starting thread
+        if not self.api_key:
+            self.handle_ai_error("API Key missing. Please check dashboard session.")
+            return
+
         # Prepare for streaming
         self.inject_message("", sender="ENGINE", is_new_stream=True)
+        
+        # Visual Confirmation: System moves to Amber Thinking state
         self.status_label.setText("SYSTEM: THINKING...")
         self.status_label.setStyleSheet(THINKING_STYLE)
 
