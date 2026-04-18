@@ -146,10 +146,10 @@ with st.sidebar:
             st.session_state.active_model = success_models[selected_index]
             
             preview_mode = st.toggle("Preview Mode (No AI Costs)", value=True, help="Skips Gemini API calls in the agent. Useful for testing hardware.")
-            disable_stealth = st.toggle("Disable Stealth Mode", value=False, help="If the agent crashes on startup, try disabling this. It prevents the window from being hidden from screen capture.")
+            disable_stealth = st.toggle("Disable Stealth Mode", value=True, help="If the agent crashes on startup, try disabling this. It prevents the window from being hidden from screen capture.")
             
             st.divider()
-            test_mode = st.toggle("🛠️ TEST MODE (Auto-Fill)", value=False, help="Injects mock data to skip manual entry for testing.")
+            test_mode = st.toggle("🛠️ TEST MODE (Auto-Fill)", value=True, help="Injects mock data to skip manual entry for testing.")
 
     st.info("The API key is required for real-time hint generation in the local agent.")
 
