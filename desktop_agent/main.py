@@ -3,7 +3,7 @@ import os
 import time
 import logging
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer, QSharedMemory
+from PyQt6.QtCore import QTimer, QSharedMemory, Qt
 
 # Modular Imports
 from ui.overlay import StealthOverlay
@@ -17,7 +17,7 @@ LOGGER = None
 HEARTBEAT_COUNT = 0
 
 # --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
-ROOT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
@@ -25,9 +25,9 @@ if ROOT_DIR not in sys.path:
 # --- FILE-BASED LOGGING SYSTEM ---
 def setup_logging():
     global LOGGER
+    # Use absolute path for logs directory
     logs_dir = os.path.join(ROOT_DIR, "logs")
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
     
     log_file = os.path.join(logs_dir, "session.log")
     
