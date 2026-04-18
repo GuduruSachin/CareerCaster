@@ -51,6 +51,7 @@ _PERSISTENT_WINDOWS = []
 # NUCLEAR PERSISTENCE: Global scope anchoring
 app = None
 overlay = None
+diag_window = None
 
 class AudioCaptureThread(QThread):
     new_chat_message = pyqtSignal(str, str) # role, text
@@ -590,8 +591,7 @@ class StealthOverlay(QWidget):
         print("Overlay: Initializing UI Layout (NUCLEAR PERSISTENCE MODE)...", flush=True)
         # NUCLEAR PERSISTENCE: Standard window with title bar and borders
         self.setWindowFlags(
-            Qt.WindowType.Window |
-            Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Window
         )
         # NUCLEAR PERSISTENCE: Disable all transparency/stealth attributes
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
@@ -920,7 +920,7 @@ class StealthOverlay(QWidget):
         event.accept()
 
 def main():
-    global app, overlay
+    global app, overlay, diag_window
     # Critical for PyInstaller + Multiprocessing on Windows
     if sys.platform == "win32":
         multiprocessing.freeze_support()
@@ -1017,43 +1017,23 @@ def main():
             overlay = StealthOverlay(session_id, session_data)
             _PERSISTENT_WINDOWS.append(overlay)
             
-            # DIAGNOSTIC: Comment out manual Win32 style calls
-            """
-            if sys.platform == "win32":
-                try:
-                    hwnd = int(overlay.winId())
-                    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-                    ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED)
-                    print("Startup: WS_EX_LAYERED style applied.", flush=True)
-                except Exception as e:
-                    print(f"Startup: Win32 Style Error: {e}", flush=True)
-            """
-
-            print("Startup: StealthOverlay instance created successfully.", flush=True)
+            # NUCLEAR PERSISTENCE: Minimal Diagnostic Window
+            print("Startup: Creating MINIMAL Diagnostic Window...", flush=True)
+            diag_window = QWidget()
+            diag_window.setWindowTitle("CareerCaster Diagnostic")
+            diag_window.resize(200, 200)
+            diag_window.setStyleSheet("background-color: blue; border: 5px solid white;")
+            diag_window.show()
+            print("Startup: Diagnostic Window shown.", flush=True)
             
-            print("Startup: Calling overlay.show()...", flush=True)
-            try:
-                overlay.showNormal()
-                overlay.show()
-                print("Startup: overlay.show() returned.", flush=True)
-                
-                overlay.setWindowOpacity(0.95)
-                print("Startup: Opacity set to 0.95", flush=True)
-                
-                overlay.raise_()
-                print("Startup: overlay.raise_() called.", flush=True)
-                
-                overlay.activateWindow()
-                print("Startup: overlay.activateWindow() called.", flush=True)
-                
-                overlay.repaint()
-                print("Startup: overlay.repaint() called.", flush=True)
-            except Exception as e_show:
-                print(f"Startup: CRITICAL ERROR during overlay.show(): {e_show}", flush=True)
-                raise e_show
+            print("Startup: Scheduling StealthOverlay.show() in 2s...", flush=True)
+            QTimer.singleShot(2000, overlay.show)
             
-            print(f"Startup: Final Geometry: {overlay.geometry()}", flush=True)
-            print("Startup: Overlay visible.", flush=True)
+            # NUCLEAR PERSISTENCE: Heartbeat timer
+            heartbeat = QTimer()
+            heartbeat.timeout.connect(lambda: print("Heartbeat: Event Loop is alive.", flush=True))
+            heartbeat.start(5000)
+            _PERSISTENT_WINDOWS.append(heartbeat)
             
             # NUCLEAR PERSISTENCE: Force native event processing
             print("Startup: Forcing native event processing...", flush=True)
