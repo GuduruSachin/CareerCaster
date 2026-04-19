@@ -10,6 +10,7 @@ except ImportError:
     genai = None
 
 from core.paths import get_logs_dir
+from core.context_refiner import extract_snippets, detect_intent, check_knowledge_gap
 
 LOGGER = logging.getLogger("CareerCaster")
 
@@ -39,18 +40,22 @@ AUDITOR = setup_ai_auditor()
 
 class AIWorker(QThread):
     """
-    CareerCaster v1.1 - AI Engine Core.
-    Handles real-time streaming tokens from the selected Gemini model.
+    CareerCaster v1.2 - RE-ENGINEERED AI Engine.
+    Handles dynamic persona pivoting and human-centric monologue generation.
     """
     token_received = pyqtSignal(str)
+    caution_signal = pyqtSignal(bool)
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, api_key, prompt, model_name="gemini-3-flash-preview"):
+    def __init__(self, api_key, prompt, history=None, model_name="gemini-3-flash-preview", jd_context="N/A", cv_context="N/A"):
         super().__init__()
         self.api_key = api_key
         self.prompt = prompt
+        self.history = history or [] # Expected format: list of {"role": "user"|"model", "parts": [{"text": ...}]}
         self.model_name = model_name
+        self.jd_context = jd_context
+        self.cv_context = cv_context
 
     def run(self):
         if not genai:
@@ -63,36 +68,79 @@ class AIWorker(QThread):
 
         start_time = time.time()
         full_response = ""
+        
+        # 1. LOCAL CONTEXT REFINEMENT (RAG-LITE)
+        jd_snippet = extract_snippets(self.prompt, self.jd_context)
+        cv_snippet = extract_snippets(self.prompt, self.cv_context)
+        persona_mode = detect_intent(self.prompt)
+        is_caution = check_knowledge_gap(self.prompt, self.cv_context)
+        
+        # Immediate Signal Emission to prevent UI flickering
+        self.caution_signal.emit(is_caution)
+
+        # Persona Pivot Logic
+        persona_title = "user's INTERNAL MONOLOGUE"
+        extra_instr = ""
+        if persona_mode == "STAR-Experience":
+            persona_title = "Senior Project Lead"
+            extra_instr = "Force the AI to use the STAR method (Situation, Task, Action, Result) based on the provided CV_SNIPPET."
+        elif persona_mode == "Architect-Technical":
+            persona_title = "Lead Software Architect"
+            extra_instr = "Deep dive into architectural trade-offs and system design patterns."
 
         try:
             client = genai.Client(api_key=self.api_key)
             
-            # Requirement 4: System Guardrails
-            system_instruction = (
-                "You are a professional interview assistant. Your goal is to provide concise, "
-                "bullet-pointed technical advice. NEVER use introductory phrases like 'Sure!' or "
-                "'Here is the code.' Focus on C# and Angular patterns. Use technical, high-level terminology. "
-                "Keep responses brief for quick reading."
-            )
+            # 3. Human-Centric System Instruction
+            system_instruction = f"""
+            Persona: You are the {persona_title}.
+            {extra_instr}
 
-            # Audit: Log Outbound Request
-            AUDITOR.info(f"[SENT_TO_AI] - System Instruction: {system_instruction}")
-            AUDITOR.info(f"[SENT_TO_AI] - User Prompt: {self.prompt}")
+            Narrative Format: Deliver answers in 2 to 3 short paragraphs with DOUBLE LINE BREAKS. 
+            Strictly FORBID bullet points, numbered lists, and markdown headers (###). 
 
-            # Requirement 2 & 3: High-Speed Streaming Logic
+            Human Tone: Use conversational anchors like "Essentially...", "In my experience...", or "The main trade-off here is...". 
+            Use regular, professional language—avoid academic jargon. Avoid repeating identical phrases from history.
+
+            Visual Scanning: BOLD 3-5 critical technical keywords per paragraph (e.g. **Microservices**).
+
+            Hallucination Guardrail:
+            - If tech is missing from context, use a "Bridge" answer: "I haven't worked with [Tech X] directly, but in my experience with [Related Tech Y], I approach it like this..."
+            - If you bridge or guess, prepend [CAUTION] to the response.
+
+            Anti-Latency Rules: ZERO FILLER | TOKEN CAPPING (~80-100 words).
+            """
+
+            # Prompt Framing: Tiny, high-impact prompt
+            refined_prompt = f"""
+            Using this [CV SNIPPET]: {cv_snippet}
+            And this [JD SNIPPET]: {jd_snippet}
+            
+            Answer this question in [{persona_mode}] mode: {self.prompt}
+            """
+
+            # Audit: Log Refinement Results
+            AUDITOR.info(f"[CONTEXT_REFINED] - Mode: {persona_mode} | Caution_Emit: {is_caution} | History_Depth: {len(self.history)}")
+            AUDITOR.info(f"[SENT_TO_AI] - Refined Prompt: {refined_prompt.strip()}")
+
+            # Prepare messages with history
+            messages = self.history + [{"role": "user", "parts": [{"text": refined_prompt.strip()}]}]
+
+            # 4. Stream Duration Monitoring
             for chunk in client.models.generate_content_stream(
                 model=self.model_name,
-                contents=self.prompt,
-                config={'system_instruction': system_instruction}
+                contents=messages,
+                config={'system_instruction': system_instruction.strip()}
             ):
                 if chunk.text:
-                    full_response += chunk.text
-                    self.token_received.emit(chunk.text)
+                    token = chunk.text
+                    full_response += token
+                    self.token_received.emit(token)
             
-            # Audit: Log Inbound Response & Metrics
+            # Audit: Log Metrics
             duration = time.time() - start_time
             AUDITOR.info(f"[RECEIVED_FROM_AI] - Full Response: {full_response}")
-            AUDITOR.info(f"[METRICS] - Stream Duration: {duration:.2f} seconds")
+            AUDITOR.info(f"[METRICS] - Duration: {duration:.2f}s | Caution_Active: {is_caution} | Mode: {persona_mode}")
 
             self.finished.emit()
         except Exception as e:

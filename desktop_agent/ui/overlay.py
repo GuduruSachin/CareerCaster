@@ -51,6 +51,10 @@ class StealthOverlay(QMainWindow):
         self.current_response_label = None
         self.current_response_text = ""
         self.ai_thread = None
+        self.current_response_caution = False # Metadata signal for UI color
+        
+        # Conversation Threading: Stores last 4 exchanges (User + Model)
+        self.message_history = [] 
 
         # Apply Global Theme
         self.setStyleSheet(MAIN_WINDOW_STYLE)
@@ -195,33 +199,76 @@ class StealthOverlay(QMainWindow):
             return
 
         # LIVE ENGINE TRIGGER
-        # Verify API key before starting thread
         if not self.api_key:
             self.handle_ai_error("API Key missing. Please check dashboard session.")
             return
 
-        # Prepare for streaming
+        # Reset state for new query
+        self.current_response_caution = False
         self.inject_message("", sender="ENGINE", is_new_stream=True)
         
         # Visual Confirmation: System moves to Amber Thinking state
         self.status_label.setText("SYSTEM: THINKING...")
         self.status_label.setStyleSheet(THINKING_STYLE)
 
-        # Requirement 2: Hook up current model_name
-        self.ai_thread = AIWorker(self.api_key, query, model_name=self.model_name)
+        # Context Extraction
+        jd_ctx = self.session_data.get("job_description", "N/A")
+        cv_ctx = self.session_data.get("resume_data", "N/A")
+        
+        # Limit history to last 8 turns (4 exchanges)
+        relevant_history = self.message_history[-8:]
+        
+        self.ai_thread = AIWorker(
+            self.api_key, 
+            query, 
+            history=relevant_history,
+            model_name=self.model_name,
+            jd_context=jd_ctx,
+            cv_context=cv_ctx
+        )
+        self.ai_thread.caution_signal.connect(self.handle_caution_signal)
+        # Update history with User input immediately
+        self.message_history.append({"role": "user", "parts": [{"text": query}]})
+        
         self.ai_thread.token_received.connect(self.update_live_response)
         self.ai_thread.finished.connect(self.ai_query_finished)
         self.ai_thread.error_occurred.connect(self.handle_ai_error)
         self.ai_thread.start()
 
+    def handle_caution_signal(self, is_active):
+        """
+        Instant Metadata-Driven UI Update:
+        Changes bubble color before first token arrives if gap detected.
+        """
+        self.current_response_caution = is_active
+        if is_active and self.current_response_bubble:
+            self.current_response_bubble.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(204, 102, 0, 0.85);
+                    border-radius: 12px;
+                    border-left: 3px solid #FFAA00;
+                }
+            """)
+
     def update_live_response(self, token):
         self.current_response_text += token
-        self.current_response_label.setText(self._process_text(self.current_response_text))
+        
+        # UI Visual Warning handled by handle_caution_signal (safer, no flickering)
+        display_text = self.current_response_text.replace("[CAUTION]", "").strip()
+        
+        self.current_response_label.setText(self._process_text(display_text))
         self.do_scroll_to_bottom()
 
     def ai_query_finished(self):
         self.status_label.setText("SYSTEM: READY")
         self.status_label.setStyleSheet(READY_STYLE)
+        
+        # Update history with Model response
+        if self.current_response_text:
+            self.message_history.append({"role": "model", "parts": [{"text": self.current_response_text}]})
+            # Ensure history doesn't grow indefinitely in memory
+            if len(self.message_history) > 20: 
+                self.message_history = self.message_history[-10:]
 
     def handle_ai_error(self, err):
         self.status_label.setText("SYSTEM: ERROR")
