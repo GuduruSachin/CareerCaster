@@ -69,64 +69,89 @@ class AIWorker(QThread):
         start_time = time.time()
         full_response = ""
         
-        # 1. LOCAL CONTEXT REFINEMENT (RAG-LITE)
+        # 1. DYNAMIC RAG-LITE CONTEXT REFINEMENT
         jd_snippet = extract_snippets(self.prompt, self.jd_context)
         cv_snippet = extract_snippets(self.prompt, self.cv_context)
         persona_mode = detect_intent(self.prompt)
         is_caution = check_knowledge_gap(self.prompt, self.cv_context)
         
-        # Immediate Signal Emission to prevent UI flickering
+        # 2. ZERO-FLICKER METADATA (Immediate caution signaling)
         self.caution_signal.emit(is_caution)
 
-        # Persona Pivot Logic
-        persona_title = "user's INTERNAL MONOLOGUE"
-        extra_instr = ""
-        if persona_mode == "STAR-Experience":
-            persona_title = "Senior Project Lead"
-            extra_instr = "Force the AI to use the STAR method (Situation, Task, Action, Result) based on the provided CV_SNIPPET."
-        elif persona_mode == "Architect-Technical":
-            persona_title = "Lead Software Architect"
-            extra_instr = "Deep dive into architectural trade-offs and system design patterns."
+        # 3. CONTEXT-AWARE PERSONA CONFIGURATION
+        persona_identity = "Umesh (Senior Developer)"
+        specific_guardrail = ""
+        
+        if persona_mode == "STAR":
+            specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CV SNIPPET]."
+        elif persona_mode == "ARCHITECT":
+            specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [JD SNIPPET]."
+        else:
+            specific_guardrail = "Provide a balanced professional response grounded in your experience."
 
         try:
             client = genai.Client(api_key=self.api_key)
             
-            # 3. Human-Centric System Instruction
+            # 4. FIRST-PERSON HUMAN MONOLOGUE GUARDRAILS
+            bridge_instr = ""
+            if is_caution:
+                bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet]...'"
+
             system_instruction = f"""
-            Persona: You are the {persona_title}.
-            {extra_instr}
+            Identity: You ARE {persona_identity}. You must speak ONLY in the first person ('I', 'Me', 'My', 'I've').
+            {bridge_instr}
+            {specific_guardrail}
 
-            Narrative Format: Deliver answers in 2 to 3 short paragraphs with DOUBLE LINE BREAKS. 
-            Strictly FORBID bullet points, numbered lists, and markdown headers (###). 
-
-            Human Tone: Use conversational anchors like "Essentially...", "In my experience...", or "The main trade-off here is...". 
-            Use regular, professional language—avoid academic jargon. Avoid repeating identical phrases from history.
-
-            Visual Scanning: BOLD 3-5 critical technical keywords per paragraph (e.g. **Microservices**).
-
-            Hallucination Guardrail:
-            - If tech is missing from context, use a "Bridge" answer: "I haven't worked with [Tech X] directly, but in my experience with [Related Tech Y], I approach it like this..."
-            - If you bridge or guess, prepend [CAUTION] to the response.
-
-            Anti-Latency Rules: ZERO FILLER | TOKEN CAPPING (~80-100 words).
-            """
-
-            # Prompt Framing: Tiny, high-impact prompt
-            refined_prompt = f"""
-            Using this [CV SNIPPET]: {cv_snippet}
-            And this [JD SNIPPET]: {jd_snippet}
+            The 'Conversational Storyteller' Protocol:
+            1. Opening Anchors (Rotate: do not use same one twice):
+               - 'So, look...'
+               - 'Basically...'
+               - 'In my time with CWT...'
+               - 'To be honest, the way I see it...'
+               - 'It’s an interesting question...'
             
-            Answer this question in [{persona_mode}] mode: {self.prompt}
+            2. Hook-Evidence-Trade-off Structure:
+               - Hook: Start with a direct spoken answer using an anchor.
+               - Evidence: Immediately pivot to a project from the [CV SNIPPET] (e.g. Enterprise Dashboard, CLR System).
+               - Trade-off: Mention a technical challenge or choice (e.g. 'I went with SQL Server over Postgres because...', 'The bottleneck was the API latency...').
+
+            3. Transition Phrases:
+               - 'The other thing is...'
+               - 'On top of that...'
+               - 'What I found out was...'
+               - 'The real trade-off there is...'
+
+            Verbal Simplification (Anti-AI Text):
+            - Use 'Workshop' terms: 'It makes it easy to connect the two' (NOT 'facilitates seamless integration'), 'It keeps things fast' (NOT 'optimal performance').
+            - 100% Contraction Enforcement: I've, Don't, We're, It's, I'm.
+            - Forbidden Words: Essentially, Furthermore, Moreover, Delineate, Comprehensive, Subject to.
+
+            Formatting & Scannability:
+            - Respond in EXACTLY 2 short paragraphs with a double line break.
+            - Total word count: 60 to 85 words.
+            - Visual Teleprompter: BOLD ONLY technical nouns (Impact Words) that Umesh needs to emphasize (e.g. **stored procedures**, **SSO**, **RESTful APIs**). Exactly 3-5 bolds per paragraph.
+
+            Anti-Latency Rules: ZERO FILLER | TOKEN CAPPING.
             """
 
-            # Audit: Log Refinement Results
-            AUDITOR.info(f"[CONTEXT_REFINED] - Mode: {persona_mode} | Caution_Emit: {is_caution} | History_Depth: {len(self.history)}")
-            AUDITOR.info(f"[SENT_TO_AI] - Refined Prompt: {refined_prompt.strip()}")
+            # Prompt Framing: Modular and snippet-focused
+            refined_prompt = f"""
+            [CV SNIPPET]: {cv_snippet}
+            [JD SNIPPET]: {jd_snippet}
+            
+            INTERVIEWER QUESTION: {self.prompt}
+            
+            Umesh, deliver your response:
+            """
+
+            # Audit: Log Refined Parameters
+            AUDITOR.info(f"[CONTEXT_ENGINE] - Mode: {persona_mode} | Caution: {is_caution} | History: {len(self.history)}")
+            AUDITOR.info(f"[SENT_TO_AI] - System Instruction: {system_instruction.strip()}")
 
             # Prepare messages with history
             messages = self.history + [{"role": "user", "parts": [{"text": refined_prompt.strip()}]}]
 
-            # 4. Stream Duration Monitoring
+            # 5. Stream Duration Monitoring
             for chunk in client.models.generate_content_stream(
                 model=self.model_name,
                 contents=messages,
@@ -137,13 +162,13 @@ class AIWorker(QThread):
                     full_response += token
                     self.token_received.emit(token)
             
-            # Audit: Log Metrics
+            # Audit: Final Metrics
             duration = time.time() - start_time
             AUDITOR.info(f"[RECEIVED_FROM_AI] - Full Response: {full_response}")
-            AUDITOR.info(f"[METRICS] - Duration: {duration:.2f}s | Caution_Active: {is_caution} | Mode: {persona_mode}")
+            AUDITOR.info(f"[METRICS] - Duration: {duration:.2f}s | Mode: {persona_mode} | Caution: {is_caution}")
 
             self.finished.emit()
         except Exception as e:
             LOGGER.error(f"AIWorker Error: {str(e)}")
-            AUDITOR.error(f"[ERROR] - AI Transaction Failed: {str(e)}")
+            AUDITOR.error(f"[ERROR] - Engine Failed: {str(e)}")
             self.error_occurred.emit(str(e))
