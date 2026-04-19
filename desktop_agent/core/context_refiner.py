@@ -96,11 +96,12 @@ def detect_intent(query):
     """
     q = query.lower()
     
-    # STAR Mode: Past actions, challenges, project history
+    # STAR Mode: Past actions, challenges, project history, and soft process triggers
     star_triggers = [
         "describe", "how did you", "tell me about", "give me an example", 
         "situation", "conflict", "challenge", "handled", "managed", "experience with",
-        "contribution", "role in", "walk me through"
+        "contribution", "role in", "walk me through", "what is your process for",
+        "how do you approach", "what was your role in"
     ]
     
     # ARCHITECT Mode: Definitions, system design, how-to

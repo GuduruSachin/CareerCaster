@@ -10,6 +10,7 @@ from .styles import (MAIN_WINDOW_STYLE, get_bubble_style, CONTENT_LABEL_STYLE,
                      STATUS_BAR_STYLE, READY_STYLE, THINKING_STYLE, ERROR_STYLE, 
                      AI_LABEL_STYLE, HEADER_TITLE_STYLE, HEADER_SESSION_STYLE)
 from core.ai_engine import AIWorker
+from core.bridge import CareerBridge
 
 LOGGER = logging.getLogger("CareerCaster")
 
@@ -58,6 +59,12 @@ class StealthOverlay(QMainWindow):
 
         # Apply Global Theme
         self.setStyleSheet(MAIN_WINDOW_STYLE)
+
+        # Stealth Ears: Bridge Initialization
+        self.bridge = CareerBridge()
+        self.bridge.status_changed.connect(self.update_bridge_status)
+        self.bridge.interviewer_text_detected.connect(self.trigger_ai_from_audio)
+        self.bridge.start()
 
         # Main Root Container
         self.root_widget = QWidget()
@@ -185,6 +192,21 @@ class StealthOverlay(QMainWindow):
     def _process_text(self, text):
         processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; background-color: #000000; color: #00FFFF; padding: 2px;">\1</span>', text)
         return processed
+
+    def update_bridge_status(self, status):
+        """Updates UI status based on bridge state."""
+        style_map = {
+            "Listening": READY_STYLE,
+            "Transcribing": THINKING_STYLE,
+            "Generating": THINKING_STYLE
+        }
+        self.status_label.setText(f"SYSTEM: {status.upper()}")
+        self.status_label.setStyleSheet(style_map.get(status, READY_STYLE))
+
+    def trigger_ai_from_audio(self, text):
+        """Callback for bridge detected interviewer text."""
+        self.mock_input.setText(text)
+        self.start_ai_query()
 
     def start_ai_query(self):
         query = self.mock_input.text().strip()
