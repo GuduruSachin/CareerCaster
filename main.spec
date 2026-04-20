@@ -6,7 +6,7 @@ block_cipher = None
 
 a = Analysis(
     ['desktop_agent/main.py'],
-    pathex=[],
+    pathex=[os.path.join(os.getcwd(), 'desktop_agent', 'pkg_mocks')],
     binaries=collect_dynamic_libs('pyaudio'),
     datas=[
         ('desktop_agent/agent_core/', 'agent_core/'),
@@ -42,7 +42,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['desktop_agent/rthook_torch.py'],
+    runtime_hooks=[],
     excludes=['tensorboard', 'torch.testing', 'torch.distributed'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
