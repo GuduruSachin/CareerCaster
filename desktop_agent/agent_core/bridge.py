@@ -2,8 +2,8 @@ import time
 import threading
 import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal
-from core.audio_capture import AudioCaptureEngine
-from core.stt_service import STTService
+from .audio_capture import AudioCaptureEngine
+from .stt_service import STTService
 
 class CareerBridge(QObject):
     """

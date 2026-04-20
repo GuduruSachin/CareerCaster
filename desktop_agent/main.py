@@ -24,9 +24,9 @@ PROJECT_ROOT = os.path.dirname(ROOT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Priority 0: Agent Root (for /core ai_engine and /ui overlay)
+# Priority 2: Agent Root (for /ui overlay and /agent_core)
 if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
+    sys.path.append(ROOT_DIR)
 
 import json
 from core.security import SecurityManager

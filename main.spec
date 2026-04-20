@@ -9,7 +9,8 @@ a = Analysis(
     pathex=[],
     binaries=collect_dynamic_libs('pyaudio'),
     datas=[
-        ('desktop_agent/core/', 'core/'),
+        ('desktop_agent/agent_core/', 'agent_core/'),
+        ('core/', 'core/'),
         ('desktop_agent/ui/', 'ui/'),
         ('desktop_agent/models/', 'models/'), # Crucial for offline VAD weights
         ('assets/', 'assets/'),

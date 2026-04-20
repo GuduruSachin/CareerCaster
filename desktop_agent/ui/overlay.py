@@ -9,8 +9,8 @@ from PyQt6.QtGui import QMouseEvent, QResizeEvent
 from .styles import (MAIN_WINDOW_STYLE, get_bubble_style, CONTENT_LABEL_STYLE, 
                      STATUS_BAR_STYLE, READY_STYLE, THINKING_STYLE, ERROR_STYLE, 
                      AI_LABEL_STYLE, HEADER_TITLE_STYLE, HEADER_SESSION_STYLE)
-from core.ai_engine import AIWorker
-from core.bridge import CareerBridge
+from agent_core.ai_engine import AIWorker
+from agent_core.bridge import CareerBridge
 
 LOGGER = logging.getLogger("CareerCaster")
 

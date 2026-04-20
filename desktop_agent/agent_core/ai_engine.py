@@ -12,7 +12,7 @@ except ImportError:
     types = None
 
 from core.paths import get_logs_dir
-from core.context_refiner import extract_snippets, detect_intent, check_knowledge_gap
+from .context_refiner import extract_snippets, detect_intent, check_knowledge_gap
 
 LOGGER = logging.getLogger("CareerCaster")
 
