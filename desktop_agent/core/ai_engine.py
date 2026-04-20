@@ -6,8 +6,10 @@ from PyQt6.QtCore import QThread, pyqtSignal
 # Import the new Google GenAI SDK
 try:
     from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 from core.paths import get_logs_dir
 from core.context_refiner import extract_snippets, detect_intent, check_knowledge_gap
@@ -142,7 +144,10 @@ class AIWorker(QThread):
             for chunk in client.models.generate_content_stream(
                 model=self.model_name,
                 contents=messages,
-                config={'system_instruction': system_instruction.strip()}
+                config=genai.types.GenerateContentConfig(
+                    system_instruction=system_instruction.strip(),
+                    temperature=0.7 # Slight randomness for more human rhythm
+                )
             ):
                 if chunk.text:
                     token = chunk.text

@@ -190,17 +190,24 @@ class StealthOverlay(QMainWindow):
         return content_label
 
     def _process_text(self, text):
-        # 1. CHARACTER SANITIZATION: Forcefully replace non-ASCII 'Smart Quotes' and dashes
-        replacements = {
-            '\u2018': "'", '\u2019': "'", # Smart single quotes
-            '\u201c': '"', '\u201d': '"', # Smart double quotes
-            '\u2013': '-', '\u2014': '-', # En and em dashes
-            '\u2026': '...'               # Ellipsis
+        """
+        CareerCaster v1.2 - ASCII Sanitization & Markdown Highlights.
+        Replaces 'Smart Quotes' and ellipsis that crash some Windows terminal fonts.
+        """
+        # 1. COMPREHENSIVE CHARACTER SANITIZATION (Regex Map)
+        # Handles smart quotes, en-dashes, and ellipsis across all Unicode blocks
+        sanitization_map = {
+            r'[\u2018\u2019\u201A\u201B]': "'",  # Smart single quotes
+            r'[\u201C\u201D\u201E\u201F]': '"',  # Smart double quotes
+            r'[\u2013\u2014\u2015]': '-',        # En, Em, and Horizontal dashes
+            r'[\u2026]': '...',                  # Ellipsis
+            r'[\u00A0]': ' '                      # Non-breaking space
         }
-        for old, new in replacements.items():
-            text = text.replace(old, new)
+        
+        for pattern, replacement in sanitization_map.items():
+            text = re.sub(pattern, replacement, text)
 
-        # 2. MARKDOWN ACCENTS: Syntax highlighting for code-like snippets
+        # 2. MARKDOWN ACCENTS: Syntax highlighting for technical terms
         processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; background-color: #000000; color: #00FFFF; padding: 2px;">\1</span>', text)
         return processed
 

@@ -20,6 +20,7 @@ a = Analysis(
         'numpy',
         'PyQt6',
         'google.genai',
+        'google.genai.types',
         'cryptography',
         'pypdf',
         'pandas',

@@ -12,7 +12,8 @@ cryptography==42.0.5
 # --- AUDIO & STEALTH ENGINE ---
 pyaudio==0.2.14
 numpy==2.2.3
-faster-whisper==1.0.3
+av==17.0.1
+faster-whisper==1.2.1
 
 # --- PYTORCH INFRASTRUCTURE (CPU-Only) ---
 --find-links https://download.pytorch.org/whl/cpu

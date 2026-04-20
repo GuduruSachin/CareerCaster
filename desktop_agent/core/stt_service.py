@@ -21,7 +21,8 @@ class STTService:
             # Fallback for Development (will require internet)
             model_vad, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                                              model='silero_vad',
-                                             force_reload=False)
+                                             force_reload=False,
+                                             map_location='cpu')
             self.vad_model = model_vad
 
     def transcribe_segment(self, audio_np):
@@ -32,6 +33,7 @@ class STTService:
 
     def is_speech(self, audio_np, threshold=0.5):
         """VAD check to see if a segment contains speech."""
-        audio_tensor = torch.from_numpy(audio_np)
+        # Hardening: Silero VAD JIT models require a batch dimension [1, samples]
+        audio_tensor = torch.from_numpy(audio_np).unsqueeze(0)
         speech_prob = self.vad_model(audio_tensor, 16000).item()
         return speech_prob > threshold
