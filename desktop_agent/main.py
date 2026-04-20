@@ -1,25 +1,16 @@
 import sys
 import os
 import types
+import warnings
 
-# --- CRITICAL PYINSTALLER MOCK: TORCH.DISTRIBUTED ---
-# CPU-only torch builds often fail when frozen because internal modules 
-# try to import torch.distributed even if it's not physically present.
-if 'torch.distributed' not in sys.modules:
-    mock_dist = types.ModuleType('torch.distributed')
-    sys.modules['torch.distributed'] = mock_dist
-    mock_dist.is_available = lambda: False
-    mock_dist.is_initialized = lambda: False
-    mock_dist.get_rank = lambda: 0
-    mock_dist.get_world_size = lambda: 1
+# --- PHASE 2: TOTAL STEALTH SUPPRESSION ---
+# Block all Torch/PyInstaller noise at the absolute entry point
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*distributed.*")
 
 import time
 import logging
-import warnings
-
-# Suppress PyInstaller/Torch noise for stealth execution
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer, QSharedMemory, Qt

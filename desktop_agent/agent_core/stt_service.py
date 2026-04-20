@@ -13,17 +13,19 @@ class STTService:
         # CPU optimized with int8
         self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
         
-        # Load Silero VAD from local directory for offline stability
-        # Path Safety: Use _MEIPASS when frozen (PyInstaller bundle root)
+        # --- PHASE 3: ZERO-DOWNLOAD ASSET LOADING ---
+        # Reliable pathing for both Development (Hard Drive) and Production (RAM Bundle)
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            base_path = sys._MEIPASS
+            # This is the temporary folder where the EXE extracts assets
+            base_dir = sys._MEIPASS
         else:
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # Fallback for standard script execution
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             
-        model_path = os.path.join(base_path, "models", "silero_vad.jit")
+        model_path = os.path.join(base_dir, "models", "silero_vad.jit")
         
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"VAD Model not found at {model_path}. Please ensure models/silero_vad.jit exists.")
+            raise FileNotFoundError(f"VAD Model missing. Path checked: {model_path}")
         
         self.vad_model = torch.jit.load(model_path)
 

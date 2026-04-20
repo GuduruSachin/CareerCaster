@@ -196,15 +196,17 @@ class StealthOverlay(QMainWindow):
         """
         # 1. COMPREHENSIVE CHARACTER SANITIZATION
         sanitization_map = {
-            r'[\u2018\u2019\u201A\u201B\u2039\u203A\u00B4\u0060]': "'",  # Single quotes, backticks, guillemets
-            r'[\u201C\u201D\u201E\u201F\u00AB\u00BB]': '"',  # Smart double quotes, double guillemets
-            r'[\u2013\u2014\u2015]': '-',        # En, Em, and Horizontal dashes
-            r'[\u2026]': '...',                  # Ellipsis
-            r'[\u00A0]': ' ',                     # Non-breaking space
-            r'\u00E2\u0080\u0099': "'",           # UTF-8 encoded smart quote (often seen as â)
-            r'\u00E2\u0080\u009C': '"',           # UTF-8 encoded open double quote
-            r'\u00E2\u0080\u009D': '"',           # UTF-8 encoded close double quote
-            r'\u00E2\u0080\u0093': '-',           # UTF-8 en-dash
+            r'[\u2018\u2019\u201A\u201B\u2039\u203A\u00B4\u0060]': "'",  # Smart/Curly single quotes
+            r'[\u201C\u201D\u201E\u201F\u00AB\u00BB]': '"',              # Smart/Curly double quotes
+            r'[\u2013\u2014\u2015]': '-',                               # En/Em dashes
+            r'[\u2026]': '...',                                         # Ellipsis
+            r'[\u00A0]': ' ',                                            # Non-breaking spaces
+            # Multi-byte UTF-8 garbage sequences
+            r'\u00E2\u0080\u0099': "'", 
+            r'\u00E2\u0080\u009C': '"', 
+            r'\u00E2\u0080\u009D': '"',
+            r'\u00E2\u0080\u0093': '-',
+            r'â': "'",  # Manual catch for likely Windows-1252 mis-decodes
         }
         
         for pattern, replacement in sanitization_map.items():
