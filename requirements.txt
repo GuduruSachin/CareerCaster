@@ -1,8 +1,20 @@
+# CareerCaster Unified Requirements (Finalized April 2026)
+# Optimized for 16GB systems with Full Core + Stealth Ears support.
+
+# --- CORE PROJECT LIBRARIES ---
 streamlit==1.56.0
 pypdf==5.1.0
 google-genai==0.3.0
 pandas==3.0.2
 PyQt6==6.11.0
+cryptography==42.0.5
+
+# --- AUDIO & STEALTH ENGINE ---
 pyaudio==0.2.14
 numpy==2.2.3
-cryptography==42.0.5
+faster-whisper==1.0.3
+
+# --- PYTORCH INFRASTRUCTURE (CPU-Only) ---
+--find-links https://download.pytorch.org/whl/cpu
+torch==2.5.1
+torchaudio==2.5.1

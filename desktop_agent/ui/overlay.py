@@ -190,6 +190,17 @@ class StealthOverlay(QMainWindow):
         return content_label
 
     def _process_text(self, text):
+        # 1. CHARACTER SANITIZATION: Forcefully replace non-ASCII 'Smart Quotes' and dashes
+        replacements = {
+            '\u2018': "'", '\u2019': "'", # Smart single quotes
+            '\u201c': '"', '\u201d': '"', # Smart double quotes
+            '\u2013': '-', '\u2014': '-', # En and em dashes
+            '\u2026': '...'               # Ellipsis
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+
+        # 2. MARKDOWN ACCENTS: Syntax highlighting for code-like snippets
         processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; background-color: #000000; color: #00FFFF; padding: 2px;">\1</span>', text)
         return processed
 
