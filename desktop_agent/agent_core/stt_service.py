@@ -20,9 +20,9 @@ class STTService:
         else:
             # Fallback for Development (will require internet)
             model_vad, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                             model='silero_vad',
-                                             force_reload=False,
-                                             map_location='cpu')
+                                              model='silero_vad',
+                                              force_reload=False,
+                                              map_location='cpu')
             self.vad_model = model_vad
 
     def transcribe_segment(self, audio_np):
