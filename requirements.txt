@@ -22,3 +22,4 @@ torchaudio==2.6.0
 
 # --- PACKAGING & DISTRIBUTION ---
 pyinstaller==6.12.0
+pyinstaller-hooks-contrib==2025.1
