@@ -17,16 +17,24 @@ LOGGER = None
 HEARTBEAT_COUNT = 0
 
 # --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(ROOT_DIR)
+if getattr(sys, 'frozen', False):
+    # Running as Bundled EXE
+    ROOT_DIR = sys._MEIPASS
+    # Ensure bundle root is at the top of sys.path for standard imports
+    if ROOT_DIR not in sys.path:
+        sys.path.insert(0, ROOT_DIR)
+else:
+    # Running as Script
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_ROOT = os.path.dirname(ROOT_DIR)
 
-# Priority 1: Project Root (for shared /core security/paths)
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+    # Priority 1: Project Root (for shared /core security/paths)
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
 
-# Priority 2: Agent Root (for /ui overlay and /agent_core)
-if ROOT_DIR not in sys.path:
-    sys.path.append(ROOT_DIR)
+    # Priority 2: Agent Root (for /ui overlay and /agent_core)
+    if ROOT_DIR not in sys.path:
+        sys.path.append(ROOT_DIR)
 
 import json
 from core.security import SecurityManager
