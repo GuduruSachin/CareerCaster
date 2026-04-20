@@ -194,14 +194,16 @@ class StealthOverlay(QMainWindow):
         CareerCaster v1.2 - ASCII Sanitization & Markdown Highlights.
         Replaces 'Smart Quotes' and ellipsis that crash some Windows terminal fonts.
         """
-        # 1. COMPREHENSIVE CHARACTER SANITIZATION (Regex Map)
-        # Handles smart quotes, en-dashes, and ellipsis across all Unicode blocks
+        # 1. COMPREHENSIVE CHARACTER SANITIZATION
         sanitization_map = {
-            r'[\u2018\u2019\u201A\u201B]': "'",  # Smart single quotes
+            r'[\u2018\u2019\u201A\u201B\u00B4\u0060]': "'",  # All variations of single quotes / backticks
             r'[\u201C\u201D\u201E\u201F]': '"',  # Smart double quotes
             r'[\u2013\u2014\u2015]': '-',        # En, Em, and Horizontal dashes
             r'[\u2026]': '...',                  # Ellipsis
-            r'[\u00A0]': ' '                      # Non-breaking space
+            r'[\u00A0]': ' ',                     # Non-breaking space
+            r'\u00E2\u0080\u0099': "'",           # UTF-8 encoded smart quote (often seen as â)
+            r'\u00E2\u0080\u009C': '"',           # UTF-8 encoded open double quote
+            r'\u00E2\u0080\u009D': '"',           # UTF-8 encoded close double quote
         }
         
         for pattern, replacement in sanitization_map.items():

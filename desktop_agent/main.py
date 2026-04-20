@@ -2,6 +2,12 @@ import sys
 import os
 import time
 import logging
+import warnings
+
+# Suppress PyInstaller/Torch noise for stealth execution
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer, QSharedMemory, Qt
 

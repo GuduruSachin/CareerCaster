@@ -14,16 +14,10 @@ class STTService:
         
         # Load Silero VAD from local directory for offline stability
         model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "silero_vad.jit")
-        if os.path.exists(model_path):
-            self.vad_model = torch.jit.load(model_path)
-            # Replicate the legacy HUB interaction if needed or use directly
-        else:
-            # Fallback for Development (will require internet)
-            model_vad, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                              model='silero_vad',
-                                              force_reload=False,
-                                              map_location='cpu')
-            self.vad_model = model_vad
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"VAD Model not found at {model_path}. Run download_vad.py first.")
+        
+        self.vad_model = torch.jit.load(model_path)
 
     def transcribe_segment(self, audio_np):
         """Transcribes a single NumPy audio segment."""

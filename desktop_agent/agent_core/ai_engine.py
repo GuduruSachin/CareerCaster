@@ -140,14 +140,17 @@ class AIWorker(QThread):
             # Prepare messages with history
             messages = self.history + [{"role": "user", "parts": [{"text": refined_prompt.strip()}]}]
 
+            # Prepare configuration using the imported types module
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction.strip(),
+                temperature=0.7 # Slight randomness for more human rhythm
+            )
+
             # 5. Stream Duration Monitoring
             for chunk in client.models.generate_content_stream(
                 model=self.model_name,
                 contents=messages,
-                config=genai.types.GenerateContentConfig(
-                    system_instruction=system_instruction.strip(),
-                    temperature=0.7 # Slight randomness for more human rhythm
-                )
+                config=config
             ):
                 if chunk.text:
                     token = chunk.text
