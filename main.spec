@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
 block_cipher = None
@@ -8,25 +9,35 @@ a = Analysis(
     pathex=[],
     binaries=collect_dynamic_libs('pyaudio'),
     datas=[
-        ('assets', 'assets'),
-        ('core', 'core'),
+        ('desktop_agent/core/', 'core/'),
+        ('desktop_agent/ui/', 'ui/'),
+        ('desktop_agent/models/', 'models/'), # Crucial for offline VAD weights
+        ('assets/', 'assets/'),
     ],
     hiddenimports=[
-        'wave',
-        'cryptography',
-        'cryptography.fernet',
-        'cryptography.hazmat.primitives.kdf.pbkdf2',
-        'cryptography.hazmat.primitives.hashes',
+        'torch',
+        'torchaudio',
+        'faster_whisper',
         'pyaudio',
-        'google.genai',
         'numpy',
-        'logging.handlers',
-        'ctypes.wintypes',
-        'multiprocessing',
+        'PyQt6',
         'PyQt6.sip',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
+        'google.genai',
+        'google.genai.types',
+        'cryptography',
+        'cryptography.fernet',
+        'cryptography.hazmat.primitives.kdf.pbkdf2',
+        'cryptography.hazmat.primitives.hashes',
+        'pypdf',
+        'pandas',
+        'streamlit',
+        'wave',
+        'logging.handlers',
+        'ctypes.wintypes',
+        'multiprocessing',
     ],
     hookspath=[],
     hooksconfig={},
@@ -46,17 +57,17 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='CareerCaster',
-    debug=True, # Temporarily set to True to catch launch failures
+    debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True, # Set to True to see the console output during debug
+    console=False, # Set to False for final stealth distribution
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/logo.ico',
+    icon='assets/logo.ico' if os.path.exists('assets/logo.ico') else None,
 )
 
 coll = COLLECT(
