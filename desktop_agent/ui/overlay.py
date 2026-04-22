@@ -19,10 +19,11 @@ class StealthOverlay(QMainWindow):
     CareerCaster v1.1 - Modular Stealth Overlay.
     Handles static opacity, chat bubble injection, and input.
     """
-    def __init__(self, session_data=None):
+    def __init__(self, session_data=None, hardware_config=None):
         super().__init__()
         
         self.session_data = session_data or {}
+        self.hardware_config = hardware_config or {}
         self.api_key = self.session_data.get("api_key")
         
         # Dashboard Sync: Dynamic Session Properties
@@ -59,12 +60,6 @@ class StealthOverlay(QMainWindow):
 
         # Apply Global Theme
         self.setStyleSheet(MAIN_WINDOW_STYLE)
-
-        # Stealth Ears: Bridge Initialization
-        self.bridge = CareerBridge()
-        self.bridge.status_changed.connect(self.update_bridge_status)
-        self.bridge.interviewer_text_detected.connect(self.trigger_ai_from_audio)
-        self.bridge.start()
 
         # Main Root Container
         self.root_widget = QWidget()
@@ -161,6 +156,15 @@ class StealthOverlay(QMainWindow):
         status_layout.addWidget(self.ai_indicator_container)
         self.root_layout.addWidget(self.status_bar)
 
+        # Stealth Ears: Bridge Initialization (Powered by hardware config)
+        itv_id = self.hardware_config.get("interviewer_device_id")
+        mic_id = self.hardware_config.get("mic_device_id")
+        
+        self.bridge = CareerBridge(interviewer_idx=itv_id, mic_idx=mic_id)
+        self.bridge.status_changed.connect(self.update_bridge_status)
+        self.bridge.interviewer_text_detected.connect(self.trigger_ai_from_audio)
+        self.bridge.start()
+
     def inject_message(self, text, sender="SYSTEM", is_new_stream=False):
         bubble = QFrame()
         bubble_layout = QVBoxLayout(bubble)
@@ -206,6 +210,7 @@ class StealthOverlay(QMainWindow):
             r'\u00E2\u0080\u009C': '"', 
             r'\u00E2\u0080\u009D': '"',
             r'\u00E2\u0080\u0093': '-',
+            r'â\x80\x99': "'", 
             r'â': "'",  # Manual catch for likely Windows-1252 mis-decodes
         }
         

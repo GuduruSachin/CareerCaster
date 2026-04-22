@@ -61,6 +61,12 @@ def get_logs_dir():
             pass
     return logs_dir
 
+def get_settings_path():
+    """
+    Returns the path to the settings.json file.
+    """
+    return os.path.join(get_exe_dir(), "settings.json")
+
 def secure_cleanup():
     """
     Deletes all files in the sessions directory and clears clipboard for security.

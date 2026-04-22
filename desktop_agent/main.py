@@ -17,14 +17,17 @@ from PyQt6.QtCore import QTimer, QSharedMemory, Qt
 
 # Modular Imports
 from ui.overlay import StealthOverlay
+from ui.green_room import GreenRoom
 
 # MODULE-LEVEL GLOBAL ANCHORS (Python 3.13 Persistence Strategy)
 APPLICATION_INSTANCE = None
 MAIN_OVERLAY = None
+GREEN_ROOM = None
 DIAGNOSTIC_TIMER = None
 MUTEX_LOCK = None
 LOGGER = None
 HEARTBEAT_COUNT = 0
+SESSION_DATA = {}
 
 # --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
 if getattr(sys, 'frozen', False):
@@ -79,8 +82,18 @@ def run_heartbeat():
     if LOGGER:
         LOGGER.info(f"Layer 4.Refactor: Heartbeat #{HEARTBEAT_COUNT} - Loop Valid at {time.strftime('%H:%M:%S')}")
 
+def start_stealth_overlay(hardware_config):
+    """Transition callback from Green Room to Stealth Overlay."""
+    global MAIN_OVERLAY, GREEN_ROOM, SESSION_DATA
+    if GREEN_ROOM:
+        GREEN_ROOM.close()
+    
+    MAIN_OVERLAY = StealthOverlay(session_data=SESSION_DATA, hardware_config=hardware_config)
+    MAIN_OVERLAY.show()
+    LOGGER.info("Stealth Overlay launched via Green Room transition.")
+
 def initialize_refined_skeleton():
-    global APPLICATION_INSTANCE, MAIN_OVERLAY, DIAGNOSTIC_TIMER, MUTEX_LOCK, LOGGER
+    global APPLICATION_INSTANCE, MAIN_OVERLAY, GREEN_ROOM, DIAGNOSTIC_TIMER, MUTEX_LOCK, LOGGER, SESSION_DATA
 
     LOGGER = setup_logging()
 
@@ -102,7 +115,9 @@ def initialize_refined_skeleton():
         security = SecurityManager()
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
             session_path = sys.argv[1]
+            LOGGER.info(f"Targeting session file: {session_path}")
             if os.path.exists(session_path):
+                LOGGER.info("Session file found. Accessing...")
                 with open(session_path, "rb") as f:
                     encrypted_data = f.read()
                 
@@ -117,7 +132,7 @@ def initialize_refined_skeleton():
                     auth_error = f"Authentication Error: {de}"
                     LOGGER.error(auth_error)
             else:
-                auth_error = "Session file missing."
+                auth_error = f"Session file missing at path: {os.path.abspath(session_path)}"
                 LOGGER.warning(auth_error)
     except Exception as e:
         auth_error = f"Security initialization failed: {e}"
@@ -131,19 +146,19 @@ def initialize_refined_skeleton():
             "test_mode": True,
             "project": "CareerCaster Agent"
         }
+        
+    SESSION_DATA = decrypted_data
 
-    # UI Construction
-    MAIN_OVERLAY = StealthOverlay(session_data=decrypted_data)
-    
-    if auth_error:
-        MAIN_OVERLAY.inject_message(f"SECURITY ALERT: {auth_error}. Operating in Limited Mode.", sender="SYSTEM")
+    # UI Construction: Stage 1 - Green Room
+    GREEN_ROOM = GreenRoom(session_data=SESSION_DATA)
+    GREEN_ROOM.ready_to_start.connect(start_stealth_overlay)
     
     # Heartbeat Watchdog
     DIAGNOSTIC_TIMER = QTimer()
     DIAGNOSTIC_TIMER.timeout.connect(run_heartbeat)
     DIAGNOSTIC_TIMER.start(5000)
 
-    MAIN_OVERLAY.show()
+    GREEN_ROOM.show()
     
     exit_code = APPLICATION_INSTANCE.exec()
     LOGGER.info("Interface shutdown sequence complete.")

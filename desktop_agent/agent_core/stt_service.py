@@ -36,9 +36,13 @@ class STTService:
         text = " ".join([s.text for s in segments]).strip()
         return text
 
-    def is_speech(self, audio_np, threshold=0.5):
+    def is_speech(self, audio_np, threshold=0.3):
         """VAD check to see if a segment contains speech."""
         # Hardening: Silero VAD JIT models require a batch dimension [1, samples]
         audio_tensor = torch.from_numpy(audio_np).unsqueeze(0)
         speech_prob = self.vad_model(audio_tensor, 16000).item()
-        return speech_prob > threshold
+        
+        if speech_prob > threshold:
+            print(f"[*] Speech Detected (Prob: {speech_prob:.2f})")
+            return True
+        return False

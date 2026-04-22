@@ -13,10 +13,13 @@ class CareerBridge(QObject):
     status_changed = pyqtSignal(str) # 'Listening', 'Transcribing', 'Generating'
     interviewer_text_detected = pyqtSignal(str)
     
-    def __init__(self):
+    def __init__(self, interviewer_idx=None, mic_idx=None):
         super().__init__()
         self.audio = AudioCaptureEngine()
         self.stt = STTService()
+        
+        self.interviewer_idx = interviewer_idx
+        self.mic_idx = mic_idx
         
         self.interviewer_buffer = []
         self.user_buffer = []
@@ -29,7 +32,10 @@ class CareerBridge(QObject):
 
     def start(self):
         self.is_active = True
-        self.audio.start_capture()
+        self.audio.start_capture(
+            interviewer_idx=self.interviewer_idx,
+            user_idx=self.mic_idx
+        )
         threading.Thread(target=self._processing_loop, daemon=True).start()
         self.status_changed.emit("Listening")
 
@@ -59,11 +65,14 @@ class CareerBridge(QObject):
             time.sleep(0.01)
 
     def _handle_interviewer_segment(self):
+        print(f"[*] Analyzing Interviewer Segment ({len(self.interviewer_buffer)} chunks)...")
         self.status_changed.emit("Transcribing")
         full_audio = np.concatenate(self.interviewer_buffer)
         text = self.stt.transcribe_segment(full_audio)
+        print(f"[*] Transcription Result: '{text}'")
         
         if len(text) > 5:
+            print("[+] Triggering AI Response...")
             self.interviewer_text_detected.emit(text)
             self.status_changed.emit("Generating")
             
