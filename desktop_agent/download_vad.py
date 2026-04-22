@@ -17,14 +17,18 @@ def download_silero_vad():
         
     print(f"[*] Target Directory: {models_dir}")
     
-    # 2. Silero VAD JIT URL (Official Stable Release)
-    # We use torch.hub to get the path, then copy it, or download directly.
-    # Direct download is more reliable for a "clean" script.
-    url = "https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.jit"
+    # 2. Silero VAD JIT URL (Official v5 Release Path)
+    # The previous URL was 404 because Silero restructured their repo.
+    url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit"
     
     if os.path.exists(target_path):
-        print(f"[!] {target_path} already exists. Skipping download.")
-        return
+        # Force re-download if it's too small (likely a 404 HTML page)
+        if os.path.getsize(target_path) < 100000: 
+            print(f"[!] {target_path} is too small. Likely corrupted. Force re-downloading...")
+            os.remove(target_path)
+        else:
+            print(f"[!] {target_path} already exists. Skipping download.")
+            return
 
     print(f"[*] Downloading Silero VAD JIT from: {url}")
     try:

@@ -27,7 +27,8 @@ class STTService:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"VAD Model missing. Path checked: {model_path}")
         
-        self.vad_model = torch.jit.load(model_path)
+        self.vad_model = torch.jit.load(model_path, map_location='cpu')
+        self.vad_model.eval() # Ensure it's in eval mode
 
     def transcribe_segment(self, audio_np):
         """Transcribes a single NumPy audio segment."""
