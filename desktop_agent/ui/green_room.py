@@ -31,8 +31,10 @@ class GreenRoom(QMainWindow):
     def __init__(self, session_data=None):
         super().__init__()
         self.session_data = session_data or {}
-        self.setWindowTitle("CareerCaster - Hardware & AI Validation")
-        self.setMinimumSize(500, 700)
+        self.setWindowTitle("CareerCaster Pro")
+        self.setFixedWidth(500)
+        self.setMinimumHeight(500)
+        self.setMaximumHeight(900)
         
         # Hardware Setup
         self.scanner = AudioScanner()
@@ -51,6 +53,7 @@ class GreenRoom(QMainWindow):
         self.scroll_area.setObjectName("MainScrollArea")
         
         self.root_widget = QWidget()
+        self.root_widget.setMinimumHeight(900)
         self.root_layout = QVBoxLayout(self.root_widget)
         self.root_layout.setContentsMargins(30, 40, 30, 40)
         self.root_layout.setSpacing(25)
@@ -61,7 +64,7 @@ class GreenRoom(QMainWindow):
         # 1. UI ATOM INITIALIZATION (MANDATORY BEFORE ANY REFRESH OR TIMERS)
         self.setStyleSheet(f"""
             QMainWindow, QScrollArea#MainScrollArea, QWidget#MainScrollArea > QWidget {{ 
-                background-color: #121212; 
+                background-color: #0A0A0A; 
             }}
             QLabel {{ color: #E0E0E0; font-family: 'Segoe UI'; }}
             QComboBox {{ 
@@ -80,7 +83,7 @@ class GreenRoom(QMainWindow):
             }}
             QProgressBar::chunk {{ background-color: #00FFFF; }}
             .SectionFrame {{ 
-                background-color: #1A1A1A; border: 1px solid #222; 
+                background-color: #121212; border: 1px solid #222; 
                 border-radius: 8px; padding: 15px; 
             }}
             .Title {{ font-size: 20px; font-weight: bold; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif; }}
@@ -91,10 +94,15 @@ class GreenRoom(QMainWindow):
             QMessageBox QLabel {{ color: #FFFFFF; font-weight: bold; font-size: 14px; }}
             QMessageBox QPushButton {{ min-width: 100px; background-color: #00FFFF; color: black; }}
 
+            /* Tactical Switch (Checkbox/Toggle simulation) */
+            QCheckBox {{ color: #E0E0E0; spacing: 10px; font-size: 13px; }}
+            QCheckBox::indicator {{ width: 18px; height: 18px; background-color: #1A1A1A; border: 1px solid #333; border-radius: 3px; }}
+            QCheckBox::indicator:checked {{ background-color: #00FFFF; }}
+
             /* Stealth Scrollbar CSS */
             QScrollBar:vertical {{
                 border: none;
-                background: #121212;
+                background: #0A0A0A;
                 width: 10px;
                 margin: 0px 0px 0px 0px;
             }}
@@ -173,7 +181,35 @@ class GreenRoom(QMainWindow):
         ai_layout.addLayout(ai_h_layout)
         self.root_layout.addWidget(ai_frame)
 
-        # --- SECTION C: CONTEXT PREVIEW ---
+        # --- SECTION C: TACTICAL SETTINGS (MIGRATED FROM DASHBOARD) ---
+        settings_frame = QFrame()
+        settings_frame.setProperty("class", "SectionFrame")
+        settings_layout = QVBoxLayout(settings_frame)
+        settings_layout.addWidget(QLabel("TACTICAL SETTINGS")).setProperty("class", "SubTitle")
+        
+        # Model Selection
+        settings_layout.addWidget(QLabel("Active AI Model:"))
+        self.model_selector = QComboBox()
+        # Populate with models from session or defaults
+        default_models = ["gemini-3-flash-preview", "gemini-1.5-flash", "gemini-1.5-pro"]
+        active_model_name = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
+        
+        for m_name in default_models:
+            self.model_selector.addItem(m_name)
+            if m_name == active_model_name:
+                self.model_selector.setCurrentText(m_name)
+        
+        settings_layout.addWidget(self.model_selector)
+        
+        # Stealth Toggle
+        from PyQt6.QtWidgets import QCheckBox
+        self.stealth_toggle = QCheckBox("Enable Stealth Overlay (Screen Protection)")
+        self.stealth_toggle.setChecked(not self.session_data.get("disable_stealth", False))
+        settings_layout.addWidget(self.stealth_toggle)
+        
+        self.root_layout.addWidget(settings_frame)
+
+        # --- SECTION D: CONTEXT PREVIEW ---
         context_frame = QFrame()
         context_frame.setProperty("class", "SectionFrame")
         context_layout = QVBoxLayout(context_frame)
@@ -206,6 +242,9 @@ class GreenRoom(QMainWindow):
         self.start_btn.setEnabled(False)
         self.start_btn.clicked.connect(self.finalize_and_start)
         self.root_layout.addWidget(self.start_btn)
+        
+        # Stretch at bottom for flexible layout
+        self.root_layout.addStretch()
 
         # Watchdog Timer
         self.watchdog = QTimer()
@@ -418,9 +457,9 @@ class GreenRoom(QMainWindow):
         # Identity Handshake
         name = self.session_data.get("candidate_name") or self.session_data.get("user_name")
         if name:
-            self.setWindowTitle(f"CareerCaster - Green Room - {name}")
-            # Optional: find the header label specifically if needed, but root_layout access is required
-            # For now, updating the window title is the cleanest identity handshake.
+            self.setWindowTitle(f"CareerCaster Pro | {name}")
+        else:
+            self.setWindowTitle("CareerCaster Pro")
         
         self.project_label.setText(f"<b>Project:</b> {project}")
         self.resume_label.setText(f"<b>Resume:</b> {len(cv_text)} chars loaded.")

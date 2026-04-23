@@ -33,6 +33,7 @@ a = Analysis(
         'cryptography.hazmat.primitives.kdf.pbkdf2',
         'cryptography.hazmat.primitives.hashes',
         'pypdf',
+        'core.credentials',
         'wave',
         'logging.handlers',
         'ctypes.wintypes',

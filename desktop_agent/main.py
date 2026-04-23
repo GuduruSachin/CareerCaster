@@ -114,7 +114,7 @@ def initialize_refined_skeleton():
     try:
         security = SecurityManager()
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
-            session_path = sys.argv[1]
+            session_path = os.path.abspath(sys.argv[1])
             LOGGER.info(f"Targeting session file: {session_path}")
             if os.path.exists(session_path):
                 LOGGER.info("Session file found. Accessing...")
@@ -125,8 +125,7 @@ def initialize_refined_skeleton():
                     raw_json = security.decrypt_data(encrypted_data)
                     decrypted_data = json.loads(raw_json)
                     
-                    # BACKWARD COMPATIBILITY & ENTERPRISE MAPPING
-                    # Map dashboard keys to engine-expected keys
+                    # DYNAMIC DATA MAPPING (WEB HUB -> AGENT BRIDGE)
                     decrypted_data['resume_data'] = decrypted_data.get('resume_text', decrypted_data.get('resume_data', ''))
                     decrypted_data['job_description'] = decrypted_data.get('jd_text', decrypted_data.get('job_description', ''))
                     decrypted_data['project'] = decrypted_data.get('project_notes', decrypted_data.get('project', ''))
