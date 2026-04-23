@@ -10,8 +10,8 @@ class AudioCaptureEngine:
     Implements WASAPI Loopback capture for Interviewer (System Output)
     and Standard Mic capture for User (Candidate).
     """
-    def __init__(self, sample_rate=16000, chunk_size=1024):
-        self.sample_rate = sample_rate
+    def __init__(self, target_rate=16000, chunk_size=1024):
+        self.target_rate = target_rate
         self.chunk_size = chunk_size
         self.pa = pyaudio.PyAudio()
         
@@ -24,6 +24,8 @@ class AudioCaptureEngine:
         
         self.is_running = False
         self.streams = []
+        self.itv_rate = target_rate
+        self.user_rate = target_rate
 
     def find_wasapi_loopback(self):
         """Finds the WASAPI Loopback device index on Windows."""
@@ -57,8 +59,7 @@ class AudioCaptureEngine:
 
     def start_capture(self, interviewer_idx=None, user_idx=None):
         """
-        Starts audio capture streams.
-        If indices are provided, it uses those. Otherwise, it attempts auto-discovery.
+        Starts audio capture streams using hardware's native rate and resampling to target rate.
         """
         self.is_running = True
         
@@ -67,40 +68,76 @@ class AudioCaptureEngine:
         
         if itv_target is not None:
             try:
+                itv_info = self.pa.get_device_info_by_index(itv_target)
+                self.itv_rate = int(itv_info.get('defaultSampleRate', 44100))
+                
                 self.streams.append(self.pa.open(
                     format=pyaudio.paInt16,
                     channels=1,
-                    rate=self.sample_rate,
+                    rate=self.itv_rate,
                     input=True,
                     input_device_index=itv_target,
                     frames_per_buffer=self.chunk_size,
                     stream_callback=self._interviewer_callback
                 ))
-                print(f"[+] Interviewer capture started on device {itv_target}")
+                print(f"[+] Interviewer capture started on device {itv_target} at {self.itv_rate}Hz")
             except Exception as e:
-                print(f"[!] Interviewer stream failed: {e}")
+                self._handle_stream_error("Interviewer", e)
 
         # 2. User Source (Microphone)
         mic_target = user_idx # If None, PyAudio uses system default
         
         try:
-            self.streams.append(self.pa.open(
-                format=pyaudio.paInt16,
-                channels=1,
-                rate=self.sample_rate,
-                input=True,
-                input_device_index=mic_target,
-                frames_per_buffer=self.chunk_size,
-                stream_callback=self._user_callback
-            ))
-            print(f"[+] User capture started on device {mic_target or 'DEFAULT'}")
+            if mic_target is None:
+                try:
+                    default_input = self.pa.get_default_input_device_info()
+                    mic_target = default_input['index']
+                except Exception as e:
+                    print(f"[!] WARNING: No default microphone found: {e}")
+                    mic_target = None
+
+            if mic_target is not None:
+                mic_info = self.pa.get_device_info_by_index(mic_target)
+                self.user_rate = int(mic_info.get('defaultSampleRate', 44100))
+                
+                self.streams.append(self.pa.open(
+                    format=pyaudio.paInt16,
+                    channels=1,
+                    rate=self.user_rate,
+                    input=True,
+                    input_device_index=mic_target,
+                    frames_per_buffer=self.chunk_size,
+                    stream_callback=self._user_callback
+                ))
+                print(f"[+] User capture started on device {mic_target} at {self.user_rate}Hz")
+            else:
+                print("[!] User capture disabled: No valid input device.")
         except Exception as e:
-            print(f"[!] User stream failed: {e}")
+            self._handle_stream_error("User", e)
+
+    def _handle_stream_error(self, source, error):
+        print(f"[!] {source} stream failed: {error}")
+        if "-9997" in str(error):
+            print(f"[ADVICE] Error -9997 (Invalid Sample Rate) detected for {source}. Suggestion: Disable 'Exclusive Mode' in Windows Sound Settings for this device.")
+
+    def _resample(self, audio_data, orig_rate):
+        """DSP Resampling Layer: Downsamples hardware audio to exactly 16kHz."""
+        if orig_rate == self.target_rate:
+            return audio_data
+        
+        duration = len(audio_data) / orig_rate
+        target_size = int(duration * self.target_rate)
+        
+        # Using numpy.interp (Linear Interpolation) for high-fidelity resampling
+        return np.interp(
+            np.linspace(0, duration, target_size),
+            np.linspace(0, duration, len(audio_data)),
+            audio_data
+        ).astype(np.float32)
 
     def _calculate_level(self, audio_data, source_type='system'):
         """
         Calculates 0-100 normalized signal level with source-specific gain compensation.
-        Laptop mics need higher multipliers; System loopback is naturally loud.
         """
         rms = np.sqrt(np.mean(np.square(audio_data)))
         multiplier = 1000 if source_type == 'mic' else 400
@@ -109,13 +146,17 @@ class AudioCaptureEngine:
     def _interviewer_callback(self, in_data, frame_count, time_info, status):
         audio_data = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
         self.interviewer_level = self._calculate_level(audio_data, source_type='system')
-        self.interviewer_queue.put(audio_data)
+        
+        resampled_data = self._resample(audio_data, self.itv_rate)
+        self.interviewer_queue.put(resampled_data)
         return (None, pyaudio.paContinue)
 
     def _user_callback(self, in_data, frame_count, time_info, status):
         audio_data = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
         self.user_level = self._calculate_level(audio_data, source_type='mic')
-        self.user_queue.put(audio_data)
+        
+        resampled_data = self._resample(audio_data, self.user_rate)
+        self.user_queue.put(resampled_data)
         return (None, pyaudio.paContinue)
 
     def stop_capture(self):

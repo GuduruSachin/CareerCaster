@@ -8,6 +8,7 @@ google-genai==0.3.0
 pandas==3.0.2
 PyQt6==6.11.0
 cryptography==42.0.5
+requests==2.33.1
 
 # --- AUDIO & STEALTH ENGINE ---
 pyaudio==0.2.14

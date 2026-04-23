@@ -45,12 +45,18 @@ class GreenRoom(QMainWindow):
         self.api_latency = -1
         self.is_scanning = False
         
-        # UI Root
+        # UI Root - Scroll Area Implementation
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setObjectName("MainScrollArea")
+        
         self.root_widget = QWidget()
         self.root_layout = QVBoxLayout(self.root_widget)
         self.root_layout.setContentsMargins(30, 40, 30, 40)
         self.root_layout.setSpacing(25)
-        self.setCentralWidget(self.root_widget)
+        
+        self.scroll_area.setWidget(self.root_widget)
+        self.setCentralWidget(self.scroll_area)
 
         # Watchdog Timer
         self.watchdog = QTimer()
@@ -58,7 +64,9 @@ class GreenRoom(QMainWindow):
         self.watchdog.timeout.connect(lambda: self.on_latency_fail("TIMEOUT"))
         
         self.setStyleSheet(f"""
-            QMainWindow {{ background-color: #0A0A0A; }}
+            QMainWindow, QScrollArea#MainScrollArea, QWidget#MainScrollArea > QWidget {{ 
+                background-color: #121212; 
+            }}
             QLabel {{ color: #E0E0E0; font-family: 'Segoe UI'; }}
             QComboBox {{ 
                 background-color: #1A1A1A; color: white; border: 1px solid #333; 
@@ -76,11 +84,35 @@ class GreenRoom(QMainWindow):
             }}
             QProgressBar::chunk {{ background-color: #00FFFF; }}
             .SectionFrame {{ 
-                background-color: #121212; border: 1px solid #1A1A1A; 
+                background-color: #1A1A1A; border: 1px solid #222; 
                 border-radius: 8px; padding: 15px; 
             }}
             .Title {{ font-size: 20px; font-weight: bold; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif; }}
             .SubTitle {{ font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px; }}
+            
+            /* High-Contrast Popups for HP Screens */
+            QMessageBox {{ background-color: #121212; }}
+            QMessageBox QLabel {{ color: #FFFFFF; font-weight: bold; font-size: 14px; }}
+            QMessageBox QPushButton {{ min-width: 100px; background-color: #00FFFF; color: black; }}
+
+            /* Stealth Scrollbar CSS */
+            QScrollBar:vertical {{
+                border: none;
+                background: #121212;
+                width: 10px;
+                margin: 0px 0px 0px 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: #333333;
+                min-height: 20px;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: #00FFFF;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
         """)
 
         # --- SECTION: HEADER ---
@@ -169,18 +201,21 @@ class GreenRoom(QMainWindow):
         context_content = QWidget()
         context_content_layout = QVBoxLayout(context_content)
         
-        project = self.session_data.get("project", "N/A")
-        jd_len = len(self.session_data.get("job_description", ""))
-        cv_len = len(self.session_data.get("resume_data", ""))
+        self.project_label = QLabel("Project: N/A")
+        self.resume_label = QLabel("Resume: 0 chars loaded.")
+        self.jd_label = QLabel("JD: 0 chars loaded.")
         
-        context_content_layout.addWidget(QLabel(f"<b>Project:</b> {project}"))
-        context_content_layout.addWidget(QLabel(f"<b>Resume:</b> {cv_len} chars loaded."))
-        context_content_layout.addWidget(QLabel(f"<b>JD:</b> {jd_len} chars loaded."))
+        context_content_layout.addWidget(self.project_label)
+        context_content_layout.addWidget(self.resume_label)
+        context_content_layout.addWidget(self.jd_label)
         context_content_layout.addStretch()
         
         self.context_scroll.setWidget(context_content)
         context_layout.addWidget(self.context_scroll)
         self.root_layout.addWidget(context_frame)
+        
+        # Initial context refresh
+        self.refresh_context()
 
         # --- FOOTER ---
         self.start_btn = QPushButton("START INTERVIEW")
@@ -378,3 +413,24 @@ class GreenRoom(QMainWindow):
         
         # Signal ready to start with hardware IDs
         self.ready_to_start.emit(settings)
+
+    def refresh_context(self):
+        """Updates UI labels with the latest session data counts and confirms identity."""
+        project = self.session_data.get("project", "N/A")
+        jd_text = self.session_data.get("job_description", "")
+        cv_text = self.session_data.get("resume_data", "")
+        
+        # Identity Handshake
+        name = self.session_data.get("candidate_name") or self.session_data.get("user_name")
+        if name:
+            self.setWindowTitle(f"CareerCaster - Green Room - {name}")
+            # Optional: find the header label specifically if needed, but root_layout access is required
+            # For now, updating the window title is the cleanest identity handshake.
+        
+        self.project_label.setText(f"<b>Project:</b> {project}")
+        self.resume_label.setText(f"<b>Resume:</b> {len(cv_text)} chars loaded.")
+        self.jd_label.setText(f"<b>JD:</b> {len(jd_text)} chars loaded.")
+        
+        # Log for diagnostics
+        LOGGER.info(f"GreenRoom Context Refreshed: Project={project}, CV={len(cv_text)}, JD={len(jd_text)}")
+        self.validate_all()
