@@ -127,12 +127,9 @@ def initialize_refined_skeleton():
                     
                     # BACKWARD COMPATIBILITY & ENTERPRISE MAPPING
                     # Map dashboard keys to engine-expected keys
-                    if 'resume_text' in decrypted_data and 'resume_data' not in decrypted_data:
-                        decrypted_data['resume_data'] = decrypted_data['resume_text']
-                    if 'jd_text' in decrypted_data and 'job_description' not in decrypted_data:
-                        decrypted_data['job_description'] = decrypted_data['jd_text']
-                    if 'project_notes' in decrypted_data and 'project' not in decrypted_data:
-                        decrypted_data['project'] = decrypted_data['project_notes']
+                    decrypted_data['resume_data'] = decrypted_data.get('resume_text', decrypted_data.get('resume_data', ''))
+                    decrypted_data['job_description'] = decrypted_data.get('jd_text', decrypted_data.get('job_description', ''))
+                    decrypted_data['project'] = decrypted_data.get('project_notes', decrypted_data.get('project', ''))
 
                     sess_id = decrypted_data.get('session_id', 'Unknown')
                     model = decrypted_data.get('active_model', {}).get('name', 'N/A')
@@ -162,11 +159,12 @@ def initialize_refined_skeleton():
     GREEN_ROOM = GreenRoom(session_data=SESSION_DATA)
     GREEN_ROOM.ready_to_start.connect(start_stealth_overlay)
     
-    # Heartbeat Watchdog
+    # Start Heartbeat Watchdog
     DIAGNOSTIC_TIMER = QTimer()
     DIAGNOSTIC_TIMER.timeout.connect(run_heartbeat)
     DIAGNOSTIC_TIMER.start(5000)
 
+    # FINAL STEP: Paint and Refresh Context
     GREEN_ROOM.show()
     GREEN_ROOM.refresh_context()
     

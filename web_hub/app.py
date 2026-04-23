@@ -283,6 +283,32 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
         
         st.session_state.saved = True
         
+        # --- NEW: One-Click Launch Logic ---
+        st.divider()
+        if st.button("🚀 Launch Interview Copilot", type="primary", use_container_width=True):
+            try:
+                # Determine executable path (dev vs prod)
+                if getattr(sys, 'frozen', False):
+                     exe_path = os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe")
+                else:
+                     # For development, we might try to launch via 'python desktop_agent/main.py'
+                     # but in the user's environment, we'll try to find the EXE first
+                     exe_path = os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe")
+                
+                if os.path.exists(exe_path):
+                    st.info(f"Launching Agent with session: {session_id}")
+                    subprocess.Popen([exe_path, file_path], creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
+                else:
+                    # Fallback for development/cloud env where EXE may not exist
+                    main_py = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
+                    if os.path.exists(main_py):
+                        st.info("Agent EXE not found. Launching via Python...")
+                        subprocess.Popen([sys.executable, main_py, file_path])
+                    else:
+                        st.error(f"Could not find CareerCaster.exe at {exe_path}. Please build the project first.")
+            except Exception as le:
+                st.error(f"Launch failed: {le}")
+
         # Persistence: Store last used session ID locally
         try:
             last_session_file = os.path.join(PROJECT_ROOT, ".last_session")

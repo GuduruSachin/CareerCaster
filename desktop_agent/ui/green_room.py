@@ -58,11 +58,7 @@ class GreenRoom(QMainWindow):
         self.scroll_area.setWidget(self.root_widget)
         self.setCentralWidget(self.scroll_area)
 
-        # Watchdog Timer
-        self.watchdog = QTimer()
-        self.watchdog.setSingleShot(True)
-        self.watchdog.timeout.connect(lambda: self.on_latency_fail("TIMEOUT"))
-        
+        # 1. UI ATOM INITIALIZATION (MANDATORY BEFORE ANY REFRESH OR TIMERS)
         self.setStyleSheet(f"""
             QMainWindow, QScrollArea#MainScrollArea, QWidget#MainScrollArea > QWidget {{ 
                 background-color: #121212; 
@@ -128,10 +124,7 @@ class GreenRoom(QMainWindow):
         audio_frame = QFrame()
         audio_frame.setProperty("class", "SectionFrame")
         audio_layout = QVBoxLayout(audio_frame)
-        
-        audio_title = QLabel("AUDIO MATRIX")
-        audio_title.setProperty("class", "SubTitle")
-        audio_layout.addWidget(audio_title)
+        audio_layout.addWidget(QLabel("AUDIO MATRIX")).setProperty("class", "SubTitle")
 
         # Interviewer Selection
         audio_layout.addWidget(QLabel("Interviewer Source (System Output):"))
@@ -154,17 +147,13 @@ class GreenRoom(QMainWindow):
         self.mic_meter = QProgressBar()
         self.mic_meter.setValue(0)
         audio_layout.addWidget(self.mic_meter)
-
         self.root_layout.addWidget(audio_frame)
 
         # --- SECTION B: AI HEALTH ---
         ai_frame = QFrame()
         ai_frame.setProperty("class", "SectionFrame")
         ai_layout = QVBoxLayout(ai_frame)
-        
-        ai_title = QLabel("AI CONNECTIVITY")
-        ai_title.setProperty("class", "SubTitle")
-        ai_layout.addWidget(ai_title)
+        ai_layout.addWidget(QLabel("AI CONNECTIVITY")).setProperty("class", "SubTitle")
         
         ai_h_layout = QHBoxLayout()
         self.status_led = QLabel()
@@ -182,16 +171,13 @@ class GreenRoom(QMainWindow):
         ai_h_layout.addStretch()
         ai_h_layout.addWidget(self.test_api_btn)
         ai_layout.addLayout(ai_h_layout)
-
         self.root_layout.addWidget(ai_frame)
 
         # --- SECTION C: CONTEXT PREVIEW ---
         context_frame = QFrame()
         context_frame.setProperty("class", "SectionFrame")
         context_layout = QVBoxLayout(context_frame)
-        context_title = QLabel("SESSION CONTEXT")
-        context_title.setProperty("class", "SubTitle")
-        context_layout.addWidget(context_title)
+        context_layout.addWidget(QLabel("SESSION CONTEXT")).setProperty("class", "SubTitle")
         
         self.context_scroll = QScrollArea()
         self.context_scroll.setWidgetResizable(True)
@@ -214,16 +200,21 @@ class GreenRoom(QMainWindow):
         context_layout.addWidget(self.context_scroll)
         self.root_layout.addWidget(context_frame)
         
-        # Initial context refresh
-        self.refresh_context()
-
         # --- FOOTER ---
         self.start_btn = QPushButton("START INTERVIEW")
         self.start_btn.setFixedHeight(55)
         self.start_btn.setEnabled(False)
         self.start_btn.clicked.connect(self.finalize_and_start)
         self.root_layout.addWidget(self.start_btn)
+
+        # Watchdog Timer
+        self.watchdog = QTimer()
+        self.watchdog.setSingleShot(True)
+        self.watchdog.timeout.connect(lambda: self.on_latency_fail("TIMEOUT"))
         
+        # Initial context refresh (Now safe as all labels and buttons are defined)
+        self.refresh_context()
+
         # Init hardware meters
         self.meter_timer = QTimer()
         self.meter_timer.timeout.connect(self.update_meters)
@@ -386,6 +377,10 @@ class GreenRoom(QMainWindow):
         self.validate_all()
 
     def validate_all(self):
+        # Defensive check to prevent crash if UI is not fully painted or diagnostic heartbeat triggers early
+        if not hasattr(self, 'start_btn') or self.start_btn is None:
+            return
+
         # Conditions for enabling START
         has_itv = self.itv_combo.currentData() != -1
         has_mic = self.mic_combo.currentData() != -1
