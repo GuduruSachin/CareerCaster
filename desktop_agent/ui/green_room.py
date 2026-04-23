@@ -53,7 +53,7 @@ class GreenRoom(QMainWindow):
         self.scroll_area.setObjectName("MainScrollArea")
         
         self.root_widget = QWidget()
-        self.root_widget.setMinimumHeight(900)
+        self.root_widget.setMinimumHeight(750)
         self.root_layout = QVBoxLayout(self.root_widget)
         self.root_layout.setContentsMargins(30, 40, 30, 40)
         self.root_layout.setSpacing(25)
@@ -66,6 +66,7 @@ class GreenRoom(QMainWindow):
             QMainWindow, QScrollArea#MainScrollArea, QWidget#MainScrollArea > QWidget {{ 
                 background-color: #0A0A0A; 
             }}
+            QScrollArea {{ border: none; background: #0A0A0A; }}
             QLabel {{ color: #E0E0E0; font-family: 'Segoe UI'; }}
             QComboBox {{ 
                 background-color: #1A1A1A; color: white; border: 1px solid #333; 
@@ -266,6 +267,7 @@ class GreenRoom(QMainWindow):
         # Connect change events
         self.itv_combo.currentIndexChanged.connect(self.on_device_selection_changed)
         self.mic_combo.currentIndexChanged.connect(self.on_device_selection_changed)
+        self.model_selector.currentTextChanged.connect(self.on_model_changed)
         
         # Immediate start of monitoring (Initial devices)
         self.on_device_selection_changed()
@@ -323,6 +325,13 @@ class GreenRoom(QMainWindow):
                             break
             except Exception as e:
                 LOGGER.error(f"Failed to load settings: {e}")
+
+    def on_model_changed(self, model_name):
+        """Updates the active model in the session data real-time."""
+        if 'active_model' not in self.session_data:
+            self.session_data['active_model'] = {}
+        self.session_data['active_model']['name'] = model_name
+        LOGGER.info(f"Tactical Switch: AI Model updated to {model_name}")
 
     def on_device_selection_changed(self):
         # Stop current capture
@@ -455,9 +464,9 @@ class GreenRoom(QMainWindow):
         cv_text = self.session_data.get("resume_data", "")
         
         # Identity Handshake
-        name = self.session_data.get("candidate_name") or self.session_data.get("user_name")
-        if name:
-            self.setWindowTitle(f"CareerCaster Pro | {name}")
+        candidate_name = self.session_data.get("candidate_name") or self.session_data.get("user_name")
+        if candidate_name:
+            self.setWindowTitle(f"CareerCaster Pro | {candidate_name}")
         else:
             self.setWindowTitle("CareerCaster Pro")
         

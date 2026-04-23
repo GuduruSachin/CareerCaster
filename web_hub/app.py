@@ -250,27 +250,30 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
         
         st.session_state.saved = True
         
-        # --- v1.6 ONE-CLICK AUTO-LAUNCH ---
-        abs_session_path = os.path.abspath(file_path)
+        # --- v1.6.1 ONE-CLICK AUTO-LAUNCH ---
+        abs_session_path = os.path.normpath(os.path.abspath(file_path))
         try:
             # Pre-flight: Kill any existing agent
             terminate_existing_agent()
             
             # Detach and Launch
-            exe_path = os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe")
+            exe_path = os.path.normpath(os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe"))
+            CREATE_NEW_CONSOLE = 0x00000010
             DETACHED_PROCESS = 0x00000008
+            
+            launch_flags = CREATE_NEW_CONSOLE | DETACHED_PROCESS if sys.platform == "win32" else 0
             
             if os.path.exists(exe_path):
                 st.info("Auto-Launching CareerCaster Pro...")
                 subprocess.Popen([exe_path, abs_session_path], 
-                               creationflags=DETACHED_PROCESS,
+                               creationflags=launch_flags,
                                close_fds=True)
             else:
-                agent_path = os.path.join(PROJECT_ROOT, "desktop_agent", "main.py")
+                agent_path = os.path.normpath(os.path.join(PROJECT_ROOT, "desktop_agent", "main.py"))
                 if os.path.exists(agent_path):
                     st.warning("EXE not found. Auto-Launching via Python...")
                     subprocess.Popen([sys.executable, agent_path, abs_session_path],
-                                   creationflags=DETACHED_PROCESS if sys.platform == "win32" else 0,
+                                   creationflags=launch_flags,
                                    close_fds=True)
             st.balloons()
             st.success("Co-Pilot Auto-Launched successfully!")
