@@ -50,7 +50,7 @@ class AIWorker(QThread):
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, api_key, prompt, history=None, model_name="gemini-3-flash-preview", jd_context="N/A", cv_context="N/A"):
+    def __init__(self, api_key, prompt, history=None, model_name="gemini-3-flash-preview", jd_context="N/A", cv_context="N/A", project_notes="N/A"):
         super().__init__()
         self.api_key = api_key
         self.prompt = prompt
@@ -58,6 +58,7 @@ class AIWorker(QThread):
         self.model_name = model_name
         self.jd_context = jd_context
         self.cv_context = cv_context
+        self.project_notes = project_notes
 
     def run(self):
         if not genai:
@@ -81,15 +82,14 @@ class AIWorker(QThread):
         self.caution_signal.emit(is_caution)
 
         # 3. CONTEXT-AWARE PERSONA CONFIGURATION
-        persona_identity = "Umesh (Senior Developer)"
         specific_guardrail = ""
         
         if persona_mode == "STAR":
-            specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CV SNIPPET]."
+            specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CV SNIPPET] and [PROJECT NOTES]."
         elif persona_mode == "ARCHITECT":
-            specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [JD SNIPPET]."
+            specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [JD SNIPPET] and [PROJECT NOTES]."
         else:
-            specific_guardrail = "Provide a balanced professional response grounded in your experience."
+            specific_guardrail = "Provide a balanced professional response grounded in your experience and supported by [PROJECT NOTES]."
 
         try:
             client = genai.Client(api_key=self.api_key)
@@ -97,12 +97,15 @@ class AIWorker(QThread):
             # 4. FIRST-PERSON HUMAN MONOLOGUE GUARDRAILS
             bridge_instr = ""
             if is_caution:
-                bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet]...'"
+                bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet/Notes]...'"
 
             system_instruction = f"""
-            Identity: You ARE Umesh (Senior Developer). You must speak ONLY in the first person ('I', 'Me', 'My').
+            Identity: You ARE the candidate. Speak ONLY in the first person ('I', 'Me', 'My').
             {bridge_instr}
             {specific_guardrail}
+
+            Contextual Assets:
+            [PROJECT NOTES]: {self.project_notes}
 
             1. Situational Response Weighting:
                - Level 1 (Intro/Short): For greetings/small talk, provide a 1-paragraph friendly spoken response.

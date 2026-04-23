@@ -223,6 +223,9 @@ class StealthOverlay(QMainWindow):
 
     def update_bridge_status(self, status):
         """Updates UI status based on bridge state."""
+        if not hasattr(self, 'status_label'):
+            return
+            
         style_map = {
             "Listening": READY_STYLE,
             "Transcribing": THINKING_STYLE,
@@ -264,6 +267,7 @@ class StealthOverlay(QMainWindow):
         # Context Extraction
         jd_ctx = self.session_data.get("job_description", "N/A")
         cv_ctx = self.session_data.get("resume_data", "N/A")
+        notes_ctx = self.session_data.get("project_notes", "N/A")
         
         # Limit history to last 8 turns (4 exchanges)
         relevant_history = self.message_history[-8:]
@@ -274,7 +278,8 @@ class StealthOverlay(QMainWindow):
             history=relevant_history,
             model_name=self.model_name,
             jd_context=jd_ctx,
-            cv_context=cv_ctx
+            cv_context=cv_ctx,
+            project_notes=notes_ctx
         )
         self.ai_thread.caution_signal.connect(self.handle_caution_signal)
         # Update history with User input immediately

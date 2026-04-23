@@ -1,5 +1,5 @@
 {
   "name": "CareerCaster",
-  "description": "A hybrid interview assistant with a web dashboard and a local stealth overlay agent.",
+  "description": "Pure Python enterprise-grade interview assistant. Stealth PyQt6 overlay with AI-powered real-time hints and Streamlit dashboard.",
   "requestFramePermissions": []
 }

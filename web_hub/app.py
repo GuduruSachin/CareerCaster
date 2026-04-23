@@ -293,6 +293,15 @@ if st.button("💾 Save & Prepare", disabled=not can_prepare, type="primary"):
             
         st.success(f"Session {session_id} prepared and ENCRYPTED!")
         
+        # Download button for local agent execution
+        st.download_button(
+            label="📥 Download Session File (.cc)",
+            data=encrypted_data,
+            file_name=f"{session_id}.cc",
+            mime="application/octet-stream",
+            help="Download this file and move it to your 'sessions' folder, or pass it as an argument to the agent."
+        )
+        
     except Exception as e:
         st.error(f"Error preparing session: {e}")
 
