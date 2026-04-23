@@ -114,7 +114,7 @@ def initialize_refined_skeleton():
     try:
         security = SecurityManager()
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
-            session_path = os.path.abspath(sys.argv[1])
+            session_path = os.path.normpath(os.path.abspath(sys.argv[1]))
             LOGGER.info(f"Targeting session file: {session_path}")
             if os.path.exists(session_path):
                 LOGGER.info("Session file found. Accessing...")
@@ -131,13 +131,12 @@ def initialize_refined_skeleton():
                     decrypted_data['project'] = decrypted_data.get('project_notes', decrypted_data.get('project', ''))
 
                     sess_id = decrypted_data.get('session_id', 'Unknown')
-                    model = decrypted_data.get('active_model', {}).get('name', 'N/A')
-                    LOGGER.info(f"Session Sync Success: {sess_id} | Model: {model}")
+                    LOGGER.info(f"Session Sync Success: {sess_id}")
                 except Exception as de:
                     auth_error = f"Authentication Error: {de}"
                     LOGGER.error(auth_error)
             else:
-                auth_error = f"Session file missing at path: {os.path.abspath(session_path)}"
+                auth_error = f"Session file missing at path: {session_path}"
                 LOGGER.warning(auth_error)
     except Exception as e:
         auth_error = f"Security initialization failed: {e}"
