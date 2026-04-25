@@ -108,21 +108,49 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
                 with open(os.path.join(exe_sessions_dir, f"{session_id}.cc"), "wb") as f:
                     f.write(encrypted_data)
 
-            # --- LAUNCH SEQUENCE ---
+            # --- v1.7.1 RESOLVE [WinError 87] & HARDEN LAUNCH SEQUENCE ---
             abs_session_path = os.path.normpath(os.path.abspath(file_path))
-            terminate_existing_agent()
             
-            exe_path = os.path.normpath(os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe"))
-            launch_flags = 0x00000010 | 0x00000008 if sys.platform == "win32" else 0 # NEW_CONSOLE | DETACHED
-            
-            if os.path.exists(exe_path):
-                subprocess.Popen([exe_path, abs_session_path], creationflags=launch_flags, close_fds=True)
-            else:
+            if not os.path.exists(abs_session_path):
+                st.error("FATAL: Session file failed to write to disk.")
+                st.stop()
+
+            try:
+                terminate_existing_agent()
+                
+                exe_path = os.path.normpath(os.path.join(PROJECT_ROOT, "dist", "CareerCaster", "CareerCaster.exe"))
                 agent_path = os.path.normpath(os.path.join(PROJECT_ROOT, "desktop_agent", "main.py"))
-                subprocess.Popen([sys.executable, agent_path, abs_session_path], creationflags=launch_flags, close_fds=True)
-            
-            st.balloons()
-            st.success("Interview Copilot Handshaked & Launched!")
+                
+                # Windows Flag Fix: Use ONLY CREATE_NEW_CONSOLE (0x10) to avoid Param 87 mismatch
+                launch_flags = 0x00000010 if sys.platform == "win32" else 0
+                
+                if os.path.exists(exe_path):
+                    launch_cmd = [exe_path, abs_session_path]
+                    st.info("Auto-Launching CareerCaster Pro (EXE)...")
+                    subprocess.Popen(
+                        launch_cmd, 
+                        creationflags=launch_flags, 
+                        shell=False,
+                        close_fds=True
+                    )
+                else:
+                    # In Dev mode, use the start command to ensure Environment inheritance (GEMINI_API_KEY)
+                    if sys.platform == "win32":
+                        # We use start "" /b cmd /c to run in background shell but inherit env correctly
+                        # The "" is a dummy title to prevent path parsing errors in start command
+                        launch_cmd = f'start "" /b cmd /c "{sys.executable} {agent_path} {abs_session_path}"'
+                        st.warning("EXE not found. Auto-Launching via Shell Context...")
+                        subprocess.Popen(launch_cmd, shell=True, env=os.environ.copy())
+                    else:
+                        launch_cmd = [sys.executable, agent_path, abs_session_path]
+                        st.warning("EXE not found. Auto-Launching via Python...")
+                        subprocess.Popen(launch_cmd, close_fds=True, env=os.environ.copy())
+                
+                st.balloons()
+                st.success("Interview Copilot Handshaked & Launched!")
+            except Exception as launch_err:
+                st.error(f"Launch Bridge Failed: {launch_err}")
+                print(f"ERROR: Failed to launch command: {launch_cmd}")
             
     except Exception as e:
         st.error(f"SaaS Bridge Fatal: {e}")

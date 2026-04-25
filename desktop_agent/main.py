@@ -30,24 +30,26 @@ HEARTBEAT_COUNT = 0
 SESSION_DATA = {}
 
 # --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
-if getattr(sys, 'frozen', False):
-    # Running as Bundled EXE
-    ROOT_DIR = sys._MEIPASS
-    # Ensure bundle root is at the top of sys.path for standard imports
-    if ROOT_DIR not in sys.path:
-        sys.path.insert(0, ROOT_DIR)
-else:
-    # Running as Script
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-    PROJECT_ROOT = os.path.dirname(ROOT_DIR)
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(base_path, relative_path))
 
-    # Priority 1: Project Root (for shared /core security/paths)
-    if PROJECT_ROOT not in sys.path:
-        sys.path.insert(0, PROJECT_ROOT)
+BUNDLE_DIR = resource_path("")
 
-    # Priority 2: Agent Root (for /ui overlay and /agent_core)
-    if ROOT_DIR not in sys.path:
-        sys.path.append(ROOT_DIR)
+# Mandatory Path Injection for EXE/Script dual-mode
+if BUNDLE_DIR not in sys.path:
+    sys.path.insert(0, BUNDLE_DIR)
+
+# Priority: Project Root (for shared /core security/paths)
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else BUNDLE_DIR
+PARENT_DIR = os.path.dirname(PROJECT_ROOT)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
 
 import json
 from core.security import SecurityManager

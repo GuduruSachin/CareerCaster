@@ -37,39 +37,54 @@ class GreenRoom(QMainWindow):
         self.setMinimumHeight(600)
         self.setMaximumHeight(900)
         
-        # AI Logic Sync
-        self.api_key = get_master_api_key()
-        self.active_model_name = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
-        
-        # Hardware Setup
-        self.scanner = AudioScanner()
-        self.audio_engine = AudioCaptureEngine()
-        self.devices = self.scanner.get_wasapi_devices()
-        
-        # State
-        self.api_latency = -1
-        self.available_models = []
-        
-        # UI Root - Scroll Area Implementation
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setObjectName("MainScrollArea")
-        self.scroll_area.setStyleSheet("QScrollArea { border: none; background: #0A0A0A; }")
-        
+        # 1. UI ROOT CONSTRUCTION
         self.root_widget = QWidget()
         self.root_widget.setMinimumHeight(750)
         self.root_layout = QVBoxLayout(self.root_widget)
         self.root_layout.setContentsMargins(30, 40, 30, 40)
         self.root_layout.setSpacing(25)
         
-        self.scroll_area.setWidget(self.root_widget)
-        self.setCentralWidget(self.scroll_area)
-
-        # 1. UI ATOM INITIALIZATION
-        self.setup_stylesheet()
+        # 2. POPULATE LAYOUT (MANDATORY BEFORE ANCHORING)
         self.init_ui_sections()
         
-        # Initial context refresh
+        # 3. APPLY STYLES (DIRECT STYLE INJECTION)
+        self.setup_stylesheet()
+        
+        # 4. ANCHOR UI (SCROLL ARCHITECTURE)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setObjectName("MainScrollArea")
+        self.scroll_area.setStyleSheet("QScrollArea { border: none; background: #0A0A0A; }")
+        self.scroll_area.setWidget(self.root_widget)
+        self.setCentralWidget(self.scroll_area)
+ 
+        # 5. ASYNC LOGIC TRIGGER (PREVENT STARTUP HANGS)
+        QTimer.singleShot(250, self.delayed_init)
+
+    def delayed_init(self):
+        """Hardened async initialization to prevent startup hangs."""
+        # AI Logic Sync (IO Bound)
+        try:
+            self.api_key = get_master_api_key()
+        except:
+            self.api_key = None
+            
+        self.active_model_name = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
+        
+        # Hardware Setup
+        try:
+            self.scanner = AudioScanner()
+            self.audio_engine = AudioCaptureEngine()
+            self.devices = self.scanner.get_wasapi_devices() or {"loopback": [], "mics": []}
+        except Exception as e:
+            LOGGER.error(f"Hardware initialization failed: {e}")
+            self.devices = {"loopback": [], "mics": []}
+        
+        # State
+        self.api_latency = -1
+        self.available_models = []
+
+        # Initial context refresh (Safe: atoms are anchored)
         self.refresh_context()
 
         # Init hardware meters
@@ -81,10 +96,10 @@ class GreenRoom(QMainWindow):
         self.populate_devices()
         self.load_saved_settings()
         
-        # V1.7 AUTO-DISCOVERY: Run on background thread
+        # Background Discovery
         threading.Thread(target=self.discover_ai_models, daemon=True).start()
         
-        # Connect change events
+        # Event Handlers
         self.itv_combo.currentIndexChanged.connect(self.on_device_selection_changed)
         self.mic_combo.currentIndexChanged.connect(self.on_device_selection_changed)
         self.model_selector.currentTextChanged.connect(self.on_model_changed)
@@ -111,18 +126,12 @@ class GreenRoom(QMainWindow):
                 border-radius: 3px; text-align: center; height: 12px; 
             }}
             QProgressBar::chunk {{ background-color: #00FFFF; }}
-            .SectionFrame {{ 
-                background-color: #121212; border: 1px solid #222; 
-                border-radius: 8px; padding: 15px; 
-            }}
-            .Title {{ font-size: 20px; font-weight: bold; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif; }}
-            .SubTitle {{ font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px; }}
             
             /* Tactical Switch */
             QCheckBox {{ color: #E0E0E0; spacing: 10px; font-size: 13px; }}
             QCheckBox::indicator {{ width: 18px; height: 18px; background-color: #1A1A1A; border: 1px solid #333; border-radius: 3px; }}
             QCheckBox::indicator:checked {{ background-color: #00FFFF; }}
-
+ 
             /* Stealth Scrollbar */
             QScrollBar:vertical {{ border: none; background: #0A0A0A; width: 10px; }}
             QScrollBar::handle:vertical {{ background: #333333; min-height: 20px; border-radius: 5px; }}
@@ -133,14 +142,16 @@ class GreenRoom(QMainWindow):
     def init_ui_sections(self):
         # HEADER
         header = QLabel("COMMAND CENTER v1.7")
-        header.setProperty("class", "Title")
+        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif;")
         self.root_layout.addWidget(header)
         
         # --- AUDIO MATRIX ---
         audio_frame = QFrame()
-        audio_frame.setProperty("class", "SectionFrame")
+        audio_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
         audio_layout = QVBoxLayout(audio_frame)
-        audio_layout.addWidget(QLabel("AUDIO MATRIX")).setProperty("class", "SubTitle")
+        stitle_audio = QLabel("AUDIO MATRIX")
+        stitle_audio.setStyleSheet("font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px;")
+        audio_layout.addWidget(stitle_audio)
         
         audio_layout.addWidget(QLabel("Interviewer (WASAPI Loopback):"))
         self.itv_combo = QComboBox()
@@ -158,9 +169,11 @@ class GreenRoom(QMainWindow):
 
         # --- TACTICAL SETTINGS ---
         settings_frame = QFrame()
-        settings_frame.setProperty("class", "SectionFrame")
+        settings_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
         settings_layout = QVBoxLayout(settings_frame)
-        settings_layout.addWidget(QLabel("TACTICAL SETTINGS")).setProperty("class", "SubTitle")
+        stitle_settings = QLabel("TACTICAL SETTINGS")
+        stitle_settings.setStyleSheet("font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px;")
+        settings_layout.addWidget(stitle_settings)
         
         settings_layout.addWidget(QLabel("Active AI Model:"))
         self.model_selector = QComboBox()
@@ -176,7 +189,7 @@ class GreenRoom(QMainWindow):
 
         # --- AI HEALTH ---
         ai_frame = QFrame()
-        ai_frame.setProperty("class", "SectionFrame")
+        ai_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
         ai_layout = QHBoxLayout(ai_frame)
         self.status_led = QLabel()
         self.status_led.setFixedSize(12, 12)
@@ -282,6 +295,7 @@ class GreenRoom(QMainWindow):
         self.mic_meter.setValue(self.audio_engine.user_level)
 
     def validate_all(self):
+        if not hasattr(self, 'root_layout'): return
         if not hasattr(self, 'start_btn') or self.start_btn is None: return
         has_itv = self.itv_combo.currentData() != -1
         has_mic = self.mic_combo.currentData() != -1
@@ -301,6 +315,8 @@ class GreenRoom(QMainWindow):
         self.ready_to_start.emit(self.session_data)
 
     def refresh_context(self):
+        if not hasattr(self, 'root_layout'): return
+        if not hasattr(self, 'session_data'): return
         name = self.session_data.get("candidate_name") or self.session_data.get("user_name", "Candidate")
         self.setWindowTitle(f"CareerCaster Pro | {name}")
         self.validate_all()
