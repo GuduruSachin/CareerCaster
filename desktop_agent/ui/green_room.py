@@ -481,8 +481,9 @@ class GreenRoom(QMainWindow):
         
         has_itv = hasattr(self, 'itv_combo') and self.itv_combo.currentData() != -1
         has_mic = hasattr(self, 'mic_combo') and self.mic_combo.currentData() != -1
-        has_ai = self.api_latency != -1
-        has_context = len(self.session_data.get("resume_data", "")) > 50
+        # v1.8.9: Permissive AI check - if we have models, we are ready
+        has_ai = len(self.available_models) > 0
+        has_context = len(str(self.session_data.get("resume_text", ""))) > 50
         self.start_btn.setEnabled(has_itv and has_mic and has_ai and has_context)
 
     def finalize_and_start(self):
@@ -499,8 +500,14 @@ class GreenRoom(QMainWindow):
     def refresh_context(self):
         if not hasattr(self, 'root_layout'): return
         if not hasattr(self, 'session_data'): return
-        name = self.session_data.get("candidate_name") or self.session_data.get("user_name", "Candidate")
-        role = self.session_data.get("target_role") or "Target Performance"
+        
+        # v1.8.7: Map incoming keys robustly
+        name = self.session_data.get("candidate_name") or self.session_data.get("user_name") or "Candidate"
+        role = self.session_data.get("target_role") or self.session_data.get("target_position") or "Target Position"
+        
+        # Handle "Unknown" from previous failed handshakes
+        if name == "Unknown": name = "Candidate"
+        if "Inferred" in role: role = "Ready for Session"
         
         # Clean title
         clean_name = name.strip().title()

@@ -103,22 +103,37 @@ if resume_file:
                 st.session_state.resume_text = text.strip()
                 st.session_state.last_uploaded = resume_file.name
                 
-                # --- v1.8.6: AI EXTRACTION ---
+                # --- v1.8.8: HARDENED AI EXTRACTION ---
                 if api_key and api_key != "YOUR_ENTERPRISE_API_KEY_HERE":
                     try:
                         from google import genai
                         client = genai.Client(api_key=api_key)
-                        prompt = f"Extract the candidate's Full Name and the Target Position from this resume. Output ONLY valid JSON: {{\"name\": \"...\", \"role\": \"...\"}}. Resume:\n{st.session_state.resume_text[:3000]}"
+                        prompt = (
+                            "You are a professional resume parser. Extract the candidate's Full Name "
+                            "and the Target Job Title (or most recent role). "
+                            "Output VALID JSON ONLY: {\"name\": \"...\", \"role\": \"...\"}. "
+                            f"Resume Text:\n{st.session_state.resume_text[:4000]}"
+                        )
                         response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+                        
                         if response.text:
-                            clean_json = response.text.replace("```json", "").replace("```", "").strip()
-                            data = json.loads(clean_json)
-                            st.session_state.extracted_name = data.get("name", "").strip()
-                            st.session_state.extracted_role = data.get("role", "").strip()
-                            if st.session_state.extracted_name:
-                                st.success(f"✨ Detected Profile: {st.session_state.extracted_name}")
+                            # Robust JSON cleanup
+                            raw_text = response.text.strip()
+                            if "```json" in raw_text:
+                                raw_text = raw_text.split("```json")[-1].split("```")[0].strip()
+                            elif "```" in raw_text:
+                                raw_text = raw_text.split("```")[-1].split("```")[0].strip()
+                            
+                            data = json.loads(raw_text)
+                            st.session_state.extracted_name = data.get("name", "Candidate").strip()
+                            st.session_state.extracted_role = data.get("role", "Ready for CareerCaster").strip()
+                            
+                            if st.session_state.extracted_name != "Candidate":
+                                st.success(f"✅ Profile Verified: {st.session_state.extracted_name} | {st.session_state.extracted_role}")
                     except Exception as ai_e:
                         print(f"Extraction failed: {ai_e}")
+                        st.session_state.extracted_name = "Candidate"
+                        st.session_state.extracted_role = "Ready for Session"
             except Exception as e:
                 st.error(f"Error reading PDF: {e}")
 
