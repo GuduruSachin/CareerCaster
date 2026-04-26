@@ -17,8 +17,8 @@ def download_silero_vad():
         
     print(f"[*] Target Directory: {models_dir}")
     
-    # 2. Silero VAD JIT URL (Refined for master branch)
-    url = "https://github.com/snakers4/silero-vad/raw/master/silero_vad.jit"
+    # 2. Silero VAD JIT URL (Corrected Source Path)
+    url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit"
     
     if os.path.exists(target_path):
         # Force re-download if it's too small or likely corrupt (common with 404 HTML responses)

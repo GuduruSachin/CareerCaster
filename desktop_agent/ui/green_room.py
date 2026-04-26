@@ -219,13 +219,13 @@ class GreenRoom(QMainWindow):
         # --- 1. BRANDING HEADER ---
         header = QWidget()
         header_lay = QVBoxLayout(header)
-        header_lay.setContentsMargins(0, 0, 0, 30)
+        header_lay.setContentsMargins(0, 10, 0, 30)
         
-        pre_title = QLabel("INTERVIEW ASSISTANT")
+        pre_title = QLabel("INTERVIEW ARCHITECT")
         pre_title.setObjectName("SectionHeader")
         
-        main_title = QLabel("CAREERCASTER")
-        main_title.setStyleSheet("font-size: 34px; font-weight: 900; color: #FFFFFF; letter-spacing: -1.5px;")
+        main_title = QLabel("CareerCaster")
+        main_title.setStyleSheet("font-size: 40px; font-weight: 800; color: #FFFFFF; letter-spacing: -1.5px;")
         
         header_lay.addWidget(pre_title)
         header_lay.addWidget(main_title)
@@ -236,17 +236,18 @@ class GreenRoom(QMainWindow):
         audio_card.setObjectName("ControlCard")
         audio_lay = QVBoxLayout(audio_card)
         audio_lay.setContentsMargins(25, 25, 25, 25)
-        audio_lay.setSpacing(20)
+        audio_lay.setSpacing(25)
 
-        h_audio = QLabel("AUDIO CONNECTION HUB")
+        h_audio = QLabel("Audio Setup")
         h_audio.setObjectName("SectionHeader")
+        h_audio.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
         audio_lay.addWidget(h_audio)
 
         # Output Monitor
         v_out = QVBoxLayout()
-        v_out.setSpacing(10)
-        lbl_out = QLabel("INTERVIEWER SOURCE (SPEAKERS/HEADPHONES)")
-        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 0.5px;")
+        v_out.setSpacing(12)
+        lbl_out = QLabel("INTERVIEWER SOURCE")
+        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 1.2px;")
         v_out.addWidget(lbl_out)
         self.itv_combo = QComboBox()
         v_out.addWidget(self.itv_combo)
@@ -256,9 +257,9 @@ class GreenRoom(QMainWindow):
 
         # Input Monitor
         v_in = QVBoxLayout()
-        v_in.setSpacing(10)
-        lbl_in = QLabel("YOUR MICROPHONE SOURCE")
-        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 0.5px;")
+        v_in.setSpacing(12)
+        lbl_in = QLabel("YOUR MICROPHONE")
+        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 1.2px;")
         v_in.addWidget(lbl_in)
         self.mic_combo = QComboBox()
         v_in.addWidget(self.mic_combo)
@@ -273,25 +274,26 @@ class GreenRoom(QMainWindow):
         session_card.setObjectName("ControlCard")
         session_lay = QVBoxLayout(session_card)
         session_lay.setContentsMargins(25, 25, 25, 25)
-        session_lay.setSpacing(15)
+        session_lay.setSpacing(18)
 
-        h_session = QLabel("SESSION INTELLIGENCE")
+        h_session = QLabel("Session Intel")
         h_session.setObjectName("SectionHeader")
+        h_session.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
         session_lay.addWidget(h_session)
 
-        self.candidate_label = QLabel("IDENTIFIED CANDIDATE: ...")
+        self.candidate_label = QLabel("Candidate: ...")
         self.candidate_label.setObjectName("DataValue")
         self.candidate_label.setWordWrap(True)
         
-        self.role_label = QLabel("TARGET POSITION: ...")
+        self.role_label = QLabel("Position: ...")
         self.role_label.setObjectName("DataValue")
         self.role_label.setWordWrap(True)
         
         session_lay.addWidget(self.candidate_label)
         session_lay.addWidget(self.role_label)
         
-        self.context_status = QLabel("● RESUME CONTEXT LOADED")
-        self.context_status.setStyleSheet("color: #10B981; font-weight: 800; font-size: 10px; margin-top: 5px;")
+        self.context_status = QLabel("● READINESS DATA SYNCED")
+        self.context_status.setStyleSheet("color: #10B981; font-weight: 800; font-size: 10px; margin-top: 5px; letter-spacing: 0.5px;")
         session_lay.addWidget(self.context_status)
         
         self.root_layout.addWidget(session_card)
@@ -301,10 +303,11 @@ class GreenRoom(QMainWindow):
         ai_card.setObjectName("ControlCard")
         ai_lay = QVBoxLayout(ai_card)
         ai_lay.setContentsMargins(25, 25, 25, 25)
-        ai_lay.setSpacing(20)
+        ai_lay.setSpacing(25)
 
-        h_ai = QLabel("TACTICAL AI CONFIG")
+        h_ai = QLabel("AI Configuration")
         h_ai.setObjectName("SectionHeader")
+        h_ai.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
         ai_lay.addWidget(h_ai)
 
         ai_row = QHBoxLayout()
@@ -313,11 +316,11 @@ class GreenRoom(QMainWindow):
         ai_row.addWidget(self.model_selector)
         
         stat_box = QVBoxLayout()
-        stat_box.setSpacing(4)
+        stat_box.setSpacing(6)
         self.status_msg = QLabel("CONNECTING...")
         self.status_msg.setStyleSheet("font-family: 'Consolas', monospace; font-size: 10px; color: #4B5563; font-weight: bold;")
         self.status_led = QLabel()
-        self.status_led.setFixedSize(35, 4)
+        self.status_led.setFixedSize(40, 4)
         self.status_led.setStyleSheet("background: #313948; border-radius: 2px;")
         stat_box.addWidget(self.status_msg)
         stat_box.addWidget(self.status_led)
@@ -348,35 +351,72 @@ class GreenRoom(QMainWindow):
         self.root_layout.addWidget(foot)
 
     def discover_ai_models(self):
-        """V1.7: Auto-Tests AI connectivity and identifies available models."""
+        """V1.8.2: Dynamic Discovery & Intelligent Latency Sort."""
         if not self.api_key:
             QTimer.singleShot(0, lambda: self.on_ai_fail("API Key Missing"))
             return
             
-        start = time.time()
-        test_list = [
-            "gemini-2.0-flash-exp", 
-            "gemini-1.5-flash", 
-            "gemini-1.5-pro", 
-            "gemini-pro"
-        ]
+        start_time = time.time()
         success_list = []
+        latency_map = {}
         
         try:
             client = genai.Client(api_key=self.api_key)
-            for m in test_list:
-                try:
-                    client.models.generate_content(model=m, contents="ping")
-                    success_list.append(m)
-                except: continue
             
-            if success_list:
-                self.api_latency = int((time.time() - start) * 1000)
-                self.available_models = success_list
+            # 1. Dynamic Discovery via API
+            # Fetching models with generateContent support
+            remote_models = client.models.list()
+            discovery_pool = []
+            for m in remote_models:
+                if "generateContent" in m.supported_methods:
+                    name = m.name.split("/")[-1]
+                    discovery_pool.append(name)
+            
+            # 2. Priority Testing (Parallel for speed)
+            # We pick the 4 most likely candidates for latency testing
+            priority_targets = ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+            tested_count = 0
+            
+            def test_latency(model_id):
+                nonlocal tested_count
+                try:
+                    ts = time.time()
+                    client.models.generate_content(model=model_id, contents="ping")
+                    lat = int((time.time() - ts) * 1000)
+                    latency_map[model_id] = lat
+                except:
+                    pass
+                tested_count += 1
+
+            threads = []
+            for target in discovery_pool:
+                # We only test a subset to avoid excessive startup lag
+                if target in priority_targets:
+                    t = threading.Thread(target=test_latency, args=(target,))
+                    t.start()
+                    threads.append(t)
+            
+            for t in threads: t.join(timeout=2.0)
+            
+            # 3. Compile Final List
+            # Sort by: (Is Tested?) -> (Latency ASC) -> (Alpha)
+            discovered_models = sorted(discovery_pool, key=lambda x: (
+                0 if x in latency_map else 1,
+                latency_map.get(x, 9999),
+                x
+            ))
+            
+            if discovered_models:
+                self.available_models = discovered_models
+                # Best performing or first in list
+                best_lat = min(latency_map.values()) if latency_map else -1
+                self.api_latency = best_lat
                 QTimer.singleShot(0, self.on_ai_success)
             else:
-                QTimer.singleShot(0, lambda: self.on_ai_fail("API Rejected Ping"))
+                QTimer.singleShot(0, lambda: self.on_ai_fail("No compatible models found"))
+                
         except Exception as e:
+            LOGGER.error(f"Discovery Error: {e}")
             QTimer.singleShot(0, lambda: self.on_ai_fail(str(e)))
 
     def on_ai_success(self):
@@ -468,11 +508,15 @@ class GreenRoom(QMainWindow):
         name = self.session_data.get("candidate_name") or self.session_data.get("user_name", "Candidate")
         role = self.session_data.get("target_role") or "Target Performance"
         
-        self.setWindowTitle(f"CAREERCASTER | {name.upper()}")
+        # Clean title
+        clean_name = name.strip().title()
+        clean_role = role.strip()
+        
+        self.setWindowTitle(f"CAREERCASTER | {clean_name}")
         
         if hasattr(self, 'candidate_label'):
-            self.candidate_label.setText(f"IDENTIFIED CANDIDATE: <b>{name.upper()}</b>")
+            self.candidate_label.setText(f"Candidate: <b>{clean_name}</b>")
         if hasattr(self, 'role_label'):
-            self.role_label.setText(f"TARGET POSITION: <b>{role.upper()}</b>")
+            self.role_label.setText(f"Position: <b>{clean_role}</b>")
             
         self.validate_all()

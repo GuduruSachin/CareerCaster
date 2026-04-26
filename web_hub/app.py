@@ -39,6 +39,11 @@ if "resume_text" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
 
+if "extracted_name" not in st.session_state:
+    st.session_state.extracted_name = ""
+if "extracted_role" not in st.session_state:
+    st.session_state.extracted_role = ""
+
 # --- Design Preview Loader ---
 if st.sidebar.checkbox("🎨 Show UI Design Preview", False):
     st.subheader("Design Preview: CareerCaster v1.8 Specialist Interface")
@@ -75,7 +80,14 @@ with st.sidebar:
     st.info("The Web Hub is now for Data Input only. AI Settings have moved to the Green Room co-pilot.")
 
 # --- Main UI Components ---
-st.subheader("📄 Step 1: Upload Data")
+st.subheader("📄 Step 1: Profile Details")
+col1, col2 = st.columns(2)
+with col1:
+    candidate_name = st.text_input("Name on Resume", value=st.session_state.extracted_name, placeholder="e.g. Pravalika")
+with col2:
+    target_role = st.text_input("Target Position", value=st.session_state.extracted_role, placeholder="e.g. Software Engineer")
+
+st.subheader("📄 Step 2: Upload Data")
 
 resume_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 
@@ -90,6 +102,23 @@ if resume_file:
                 reader = PdfReader(resume_file)
                 text = "".join([page.extract_text() or "" for page in reader.pages])
                 st.session_state.resume_text = text.strip()
+                
+                # --- v1.8.1: AI EXTRACTION ---
+                if api_key and api_key != "YOUR_ENTERPRISE_API_KEY_HERE":
+                    try:
+                        from google import genai
+                        client = genai.Client(api_key=api_key)
+                        prompt = f"Extract the full name and the target job title from this resume. Output ONLY valid JSON like: {{\"name\": \"John Doe\", \"role\": \"Software Engineer\"}}. Resume:\n{st.session_state.resume_text[:2000]}"
+                        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+                        if response.text:
+                            # Clean up potential markdown formatting
+                            clean_json = response.text.strip().replace("```json", "").replace("```", "").strip()
+                            data = json.loads(clean_json)
+                            st.session_state.extracted_name = data.get("name", "")
+                            st.session_state.extracted_role = data.get("role", "")
+                            st.info(f"✨ AI Extracted: {st.session_state.extracted_name} | {st.session_state.extracted_role}")
+                    except Exception as ai_e:
+                        print(f"Extraction failed: {ai_e}")
             except Exception as e:
                 st.error(f"Error reading PDF: {e}")
 
@@ -110,6 +139,8 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
                 "api_key": api_key,
                 "resume_text": st.session_state.resume_text,
                 "jd_text": jd_text,
+                "candidate_name": candidate_name or "Unknown",
+                "target_role": target_role or "Inferred from JD",
                 "session_id": session_id,
             }
             
