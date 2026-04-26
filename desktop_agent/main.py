@@ -113,6 +113,14 @@ def initialize_refined_skeleton():
     auth_error = None
     try:
         security = SecurityManager()
+        
+        # --- V1.7.9: SILERO VAD AUTO-RECOVERY ---
+        vad_path = os.path.join(CURRENT_DIR, "models", "silero_vad.jit")
+        if not os.path.exists(vad_path) or os.path.getsize(vad_path) < 500000:
+            LOGGER.info("[!] VAD Model missing or corrupt. Launching recovery...")
+            from download_vad import download_silero_vad
+            download_silero_vad()
+
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
             session_path = os.path.normpath(os.path.abspath(sys.argv[1]))
             LOGGER.info(f"Targeting session file: {session_path}")
@@ -129,6 +137,10 @@ def initialize_refined_skeleton():
                     decrypted_data['resume_data'] = decrypted_data.get('resume_text', decrypted_data.get('resume_data', ''))
                     decrypted_data['job_description'] = decrypted_data.get('jd_text', decrypted_data.get('job_description', ''))
                     decrypted_data['project'] = decrypted_data.get('project_notes', decrypted_data.get('project', ''))
+                    
+                    # HARDENED IDENTITY MAPPING
+                    decrypted_data['candidate_name'] = decrypted_data.get('candidate_name', decrypted_data.get('user_name', 'Pravalika'))
+                    decrypted_data['target_role'] = decrypted_data.get('target_role', decrypted_data.get('target_position', 'Software Engineer'))
 
                     sess_id = decrypted_data.get('session_id', 'Unknown')
                     LOGGER.info(f"Session Sync Success: {sess_id}")

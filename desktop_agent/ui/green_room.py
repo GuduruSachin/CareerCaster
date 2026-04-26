@@ -39,9 +39,10 @@ class GreenRoom(QMainWindow):
         
         # 1. UI ROOT CONSTRUCTION
         self.root_widget = QWidget()
+        self.root_widget.setObjectName("MainContainer")
         self.root_widget.setMinimumHeight(750)
         self.root_layout = QVBoxLayout(self.root_widget)
-        self.root_layout.setContentsMargins(30, 40, 30, 40)
+        self.root_layout.setContentsMargins(25, 30, 25, 30)
         self.root_layout.setSpacing(25)
         
         # 2. POPULATE LAYOUT (MANDATORY BEFORE ANCHORING)
@@ -110,69 +111,70 @@ class GreenRoom(QMainWindow):
         self.on_device_selection_changed()
 
     def setup_stylesheet(self):
-        """Solid-State Professional Theme - High Reliability & Contrast."""
+        """Bento-Style Professional Theme - High Reliability & Solid Palette."""
         self.setStyleSheet("""
             QMainWindow, QScrollArea, QWidget#MainContainer {
-                background-color: #0B0D11;
+                background-color: #0A0A0A;
                 border: none;
             }
-            QScrollArea { border: none; }
+            QScrollArea { background-color: #0A0A0A; border: none; }
+            QScrollArea > QWidget { background-color: #0A0A0A; }
+            QScrollArea QWidget#qt_scrollarea_viewport { background-color: #0A0A0A; }
             
-            /* Labels */
+            /* Typography Hardening */
             QLabel {
                 color: #A0AAB7;
-                font-family: 'Segoe UI', system-ui;
+                font-family: 'Segoe UI', sans-serif;
                 font-size: 13px;
                 background: transparent;
             }
             
-            /* High-Visibility Section Headers */
+            /* Bento Section Headers (Manual Upper in Code) */
             QLabel#SectionHeader {
                 color: #00E5FF;
                 font-weight: 800;
                 font-size: 11px;
                 letter-spacing: 1.5px;
-                text-transform: uppercase;
                 margin-bottom: 5px;
             }
             
-            /* Data Display */
+            /* Data Values */
             QLabel#DataValue {
                 color: #FFFFFF;
                 font-size: 15px;
                 font-weight: 600;
             }
-
-            /* Solid Professional Cards */
+ 
+            /* Bento Card Design */
             QFrame#ControlCard {
-                background-color: #161A21;
-                border: 1px solid #252A34;
+                background-color: #121212;
+                border: 1px solid #1E1E1E;
                 border-radius: 12px;
             }
             QFrame#ControlCard:hover {
-                border: 1px solid #303743;
+                border: 1px solid #2A2A2A;
             }
-
-            /* Component Overrides */
+ 
+            /* Component Polarity */
             QComboBox {
-                background-color: #1C222D;
-                border: 1px solid #313948;
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
                 border-radius: 8px;
                 padding: 12px 15px;
                 color: #FFFFFF;
                 font-size: 13px;
             }
-            QComboBox:hover { border: 1px solid #445065; }
+            QComboBox:hover { border: 1px solid #3A3A3A; }
             QComboBox QAbstractItemView {
-                background-color: #1C222D;
+                background-color: #1A1A1A;
                 color: white;
                 selection-background-color: #00E5FF;
                 selection-color: black;
             }
-
+ 
             QProgressBar {
-                background-color: #0D1014;
-                border: 1px solid #1C222D;
+                background-color: #0A0A0A;
+                border: 1px solid #1A1A1A;
                 border-radius: 3px;
                 height: 5px;
                 text-align: center;
@@ -182,8 +184,8 @@ class GreenRoom(QMainWindow):
                 background-color: #00E5FF;
                 border-radius: 2px;
             }
-
-            /* Main Action Button */
+ 
+            /* Action Button Surface */
             QPushButton#ActionBtn {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #00A3FF);
                 color: #000000;
@@ -191,25 +193,24 @@ class GreenRoom(QMainWindow):
                 font-size: 15px;
                 border-radius: 12px;
                 padding: 20px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+                letter-spacing: 1.5px;
             }
             QPushButton#ActionBtn:hover {
                 background: #00FBFF;
             }
             QPushButton#ActionBtn:disabled {
-                background: #252A34;
-                color: #4C566A;
-                border: 1px solid #252A34;
+                background: #1E1E1E;
+                color: #444444;
+                border: 1px solid #1E1E1E;
             }
             
             QCheckBox { color: #8F9BA8; font-size: 12px; spacing: 10px; }
-            QCheckBox::indicator { width: 20px; height: 20px; border-radius: 5px; border: 1px solid #313948; background: #1C222D; }
+            QCheckBox::indicator { width: 20px; height: 20px; border-radius: 5px; border: 1px solid #2A2A2A; background: #1A1A1A; }
             QCheckBox::indicator:checked { background-color: #00E5FF; border: 1px solid #00E5FF; }
-
-            /* Professional Scrollbar */
-            QScrollBar:vertical { background: #0B0D11; width: 10px; margin: 0; }
-            QScrollBar::handle:vertical { background: #1C222D; border-radius: 5px; min-height: 30px; }
+ 
+            /* Tactical Scrollbar */
+            QScrollBar:vertical { background: #0A0A0A; width: 8px; margin: 0; }
+            QScrollBar::handle:vertical { background: #1E1E1E; border-radius: 4px; min-height: 30px; }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         """)
 
@@ -237,15 +238,15 @@ class GreenRoom(QMainWindow):
         audio_lay.setContentsMargins(25, 25, 25, 25)
         audio_lay.setSpacing(20)
 
-        h_audio = QLabel("SYSTEM AUDIO SETUP")
+        h_audio = QLabel("AUDIO CONNECTION HUB")
         h_audio.setObjectName("SectionHeader")
         audio_lay.addWidget(h_audio)
 
         # Output Monitor
         v_out = QVBoxLayout()
-        v_out.setSpacing(8)
-        lbl_out = QLabel("INTERVIEWER SOURCE (Speakers/Headphones)")
-        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 11px;")
+        v_out.setSpacing(10)
+        lbl_out = QLabel("INTERVIEWER SOURCE (SPEAKERS/HEADPHONES)")
+        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 0.5px;")
         v_out.addWidget(lbl_out)
         self.itv_combo = QComboBox()
         v_out.addWidget(self.itv_combo)
@@ -255,9 +256,9 @@ class GreenRoom(QMainWindow):
 
         # Input Monitor
         v_in = QVBoxLayout()
-        v_in.setSpacing(8)
+        v_in.setSpacing(10)
         lbl_in = QLabel("YOUR MICROPHONE SOURCE")
-        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 11px;")
+        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 0.5px;")
         v_in.addWidget(lbl_in)
         self.mic_combo = QComboBox()
         v_in.addWidget(self.mic_combo)
@@ -272,16 +273,19 @@ class GreenRoom(QMainWindow):
         session_card.setObjectName("ControlCard")
         session_lay = QVBoxLayout(session_card)
         session_lay.setContentsMargins(25, 25, 25, 25)
-        session_lay.setSpacing(12)
+        session_lay.setSpacing(15)
 
-        h_session = QLabel("INTERVIEW DATA SUMMARY")
+        h_session = QLabel("SESSION INTELLIGENCE")
         h_session.setObjectName("SectionHeader")
         session_lay.addWidget(h_session)
 
         self.candidate_label = QLabel("IDENTIFIED CANDIDATE: ...")
         self.candidate_label.setObjectName("DataValue")
+        self.candidate_label.setWordWrap(True)
+        
         self.role_label = QLabel("TARGET POSITION: ...")
         self.role_label.setObjectName("DataValue")
+        self.role_label.setWordWrap(True)
         
         session_lay.addWidget(self.candidate_label)
         session_lay.addWidget(self.role_label)
@@ -297,9 +301,9 @@ class GreenRoom(QMainWindow):
         ai_card.setObjectName("ControlCard")
         ai_lay = QVBoxLayout(ai_card)
         ai_lay.setContentsMargins(25, 25, 25, 25)
-        ai_lay.setSpacing(15)
+        ai_lay.setSpacing(20)
 
-        h_ai = QLabel("AI CO-PILOT CONFIG")
+        h_ai = QLabel("TACTICAL AI CONFIG")
         h_ai.setObjectName("SectionHeader")
         ai_lay.addWidget(h_ai)
 
@@ -311,7 +315,7 @@ class GreenRoom(QMainWindow):
         stat_box = QVBoxLayout()
         stat_box.setSpacing(4)
         self.status_msg = QLabel("CONNECTING...")
-        self.status_msg.setStyleSheet("font-family: 'Consolas', monospace; font-size: 11px; color: #4B5563; font-weight: bold;")
+        self.status_msg.setStyleSheet("font-family: 'Consolas', monospace; font-size: 10px; color: #4B5563; font-weight: bold;")
         self.status_led = QLabel()
         self.status_led.setFixedSize(35, 4)
         self.status_led.setStyleSheet("background: #313948; border-radius: 2px;")
@@ -329,7 +333,7 @@ class GreenRoom(QMainWindow):
         self.root_layout.addWidget(ai_card)
 
         # --- 5. INITIALIZE ACTION ---
-        self.root_layout.addStretch()
+        self.root_layout.addStretch(1)
         
         self.start_btn = QPushButton("FINALIZE & START COPILOT")
         self.start_btn.setObjectName("ActionBtn")
@@ -350,7 +354,12 @@ class GreenRoom(QMainWindow):
             return
             
         start = time.time()
-        test_list = ["gemini-3-flash-preview", "gemini-1.5-flash", "gemini-1.5-pro"]
+        test_list = [
+            "gemini-2.0-flash-exp", 
+            "gemini-1.5-flash", 
+            "gemini-1.5-pro", 
+            "gemini-pro"
+        ]
         success_list = []
         
         try:

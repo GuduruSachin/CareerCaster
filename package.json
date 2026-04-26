@@ -4,7 +4,9 @@
   "version": "1.3.0",
   "type": "module",
   "scripts": {
+    "dev": "streamlit run web_hub/app.py --server.port 3000 --server.address 0.0.0.0",
     "build": "echo 'Static build complete'",
+    "start": "streamlit run web_hub/app.py --server.port 3000 --server.address 0.0.0.0",
     "clean": "rm -rf dist",
     "lint": "echo 'Pure Python: Skipping JS/TS linting'"
   }
