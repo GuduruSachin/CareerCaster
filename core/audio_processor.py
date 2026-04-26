@@ -1,4 +1,4 @@
-import pyaudio
+import pyaudiowpatch as pyaudio
 import numpy as np
 import wave
 import io
@@ -83,38 +83,20 @@ class AudioProcessor:
 
     def find_wasapi_loopback_device(self):
         """
-        Finds the WASAPI loopback device index.
+        Finds the WASAPI loopback device index using PyAudioWPatch natives.
         """
         try:
-            # Get default WASAPI host API index
-            wasapi_info = None
-            for i in range(self.pa.get_host_api_count()):
-                info = self.pa.get_host_api_info_by_index(i)
-                if info["name"].find("Windows WASAPI") != -1:
-                    wasapi_info = info
-                    break
-            
-            if not wasapi_info:
-                print("WASAPI Host API not found.")
-                return None
-
-            # Look for the loopback device
-            for i in range(self.pa.get_device_count()):
-                info = self.pa.get_device_info_by_index(i)
-                # We look for a device that is an output device but can be used as input (loopback)
-                if info["hostApi"] == wasapi_info["index"] and info["maxInputChannels"] > 0:
-                    # Usually contains "Loopback" in the name on Windows
-                    if "Loopback" in info["name"]:
-                        return i
-            
-            # Fallback: return the first WASAPI device with input channels
-            for i in range(self.pa.get_device_count()):
-                info = self.pa.get_device_info_by_index(i)
-                if info["hostApi"] == wasapi_info["index"] and info["maxInputChannels"] > 0:
-                    return i
-                    
+            device = self.pa.get_default_wasapi_loopback()
+            return device["index"]
         except Exception as e:
-            print(f"Error finding WASAPI device: {e}")
+            print(f"Error finding WASAPI device via default loopback, falling back: {e}")
+            try:
+                for i in range(self.pa.get_device_count()):
+                    info = self.pa.get_device_info_by_index(i)
+                    if info.get("isLoopbackDevice", False):
+                        return i
+            except Exception as inner_e:
+                print(f"Device fallback failed: {inner_e}")
         return None
 
     def pcm_to_base64_wav(self, pcm_data):

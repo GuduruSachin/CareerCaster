@@ -5,7 +5,7 @@ import logging
 import threading
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QComboBox, QPushButton, QProgressBar, 
-                             QFrame, QScrollArea, QSizePolicy, QCheckBox, QGridLayout)
+                             QFrame, QScrollArea, QSizePolicy, QCheckBox, QGridLayout, QMessageBox)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 
@@ -78,35 +78,52 @@ class GreenRoom(QMainWindow):
             LOGGER.error(f"Failed to retrieve API key: {e}")
             self.api_key = None
             
+        # Consent Check
+        reply = QMessageBox.question(
+            self, 'Hardware Access Consent',
+            'CareerCaster needs to access your Microphone and System Loopback (Speakers) for the interview analysis. Allow?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        has_consent = (reply == QMessageBox.StandardButton.Yes)
+
         # Hardware Setup
-        try:
-            from agent_core.audio_scanner import AudioScanner
-            from agent_core.audio_capture import AudioCaptureEngine
-            self.scanner = AudioScanner()
-            self.audio_engine = AudioCaptureEngine()
-            self.devices = self.scanner.get_wasapi_devices() or {"loopback": [], "mics": []}
-        except Exception as e:
-            LOGGER.error(f"Hardware initialization failed: {e}")
+        if has_consent:
+            try:
+                from agent_core.audio_scanner import AudioScanner
+                from agent_core.audio_capture import AudioCaptureEngine
+                self.scanner = AudioScanner()
+                self.audio_engine = AudioCaptureEngine()
+                self.devices = self.scanner.get_wasapi_devices() or {"loopback": [], "mics": []}
+            except Exception as e:
+                LOGGER.error(f"Hardware initialization failed: {e}")
+                self.devices = {"loopback": [], "mics": []}
+            
+            # Init hardware meters
+            self.meter_timer = QTimer()
+            self.meter_timer.timeout.connect(self.update_meters)
+            self.meter_timer.start(50)
+            
+            # Populate and Load
+            self.populate_devices()
+            self.load_saved_settings()
+            
+            self.itv_combo.currentIndexChanged.connect(self.on_device_selection_changed)
+            self.mic_combo.currentIndexChanged.connect(self.on_device_selection_changed)
+            self.on_device_selection_changed()
+        else:
             self.devices = {"loopback": [], "mics": []}
-        
-        # Init hardware meters
-        self.meter_timer = QTimer()
-        self.meter_timer.timeout.connect(self.update_meters)
-        self.meter_timer.start(50)
-        
-        # Populate and Load
-        self.populate_devices()
-        self.load_saved_settings()
+            self.itv_combo.addItem("Access Denied", -1)
+            self.mic_combo.addItem("Access Denied", -1)
+            self.itv_combo.setEnabled(False)
+            self.mic_combo.setEnabled(False)
         
         # Background Discovery & Pre-loading
         threading.Thread(target=self.discover_ai_models, daemon=True).start()
         threading.Thread(target=self.prewarm_stt, daemon=True).start()
         
         # Event Handlers
-        self.itv_combo.currentIndexChanged.connect(self.on_device_selection_changed)
-        self.mic_combo.currentIndexChanged.connect(self.on_device_selection_changed)
         self.model_selector.currentTextChanged.connect(self.on_model_changed)
-        self.on_device_selection_changed()
         self.validate_all()
 
     def setup_stylesheet(self):
@@ -390,13 +407,9 @@ class GreenRoom(QMainWindow):
                     except Exception:
                         pass 
 
-                # Prioritize testing
-                reliable_seeds = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-                test_set = sorted(candidates, key=lambda x: x[0] not in reliable_seeds)
-                
+                # Test all retrieved valid models cleanly without prioritizing specific "seed" models.
                 threads = []
-                # Test top candidates in parallel
-                for m_short, m_full in test_set[:10]:
+                for m_short, m_full in candidates:
                     t = threading.Thread(target=ping_model, args=(m_short, m_full))
                     t.daemon = True
                     t.start()

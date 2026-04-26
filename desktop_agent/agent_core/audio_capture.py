@@ -2,7 +2,7 @@ import os
 import queue
 import threading
 import numpy as np
-import pyaudio
+import pyaudiowpatch as pyaudio
 
 class AudioCaptureEngine:
     """
@@ -28,34 +28,19 @@ class AudioCaptureEngine:
         self.user_rate = target_rate
 
     def find_wasapi_loopback(self):
-        """Finds the WASAPI Loopback device index on Windows."""
+        """Finds the WASAPI Loopback device index on Windows using PyAudioWPatch natively."""
         try:
-            default_host_api = self.pa.get_default_host_api_info()
-        except:
-            print("[!] Could not get default host API info.")
-            return None
-
-        found_wasapi = False
-        api_index = -1
-        for i in range(self.pa.get_host_api_count()):
-            api_info = self.pa.get_host_api_info_by_index(i)
-            if "WASAPI" in api_info.get("name", ""):
-                found_wasapi = True
-                api_index = i
-                break
-        
-        if not found_wasapi:
-            print("[!] WASAPI Host API not found.")
-            return None
-
-        for i in range(self.pa.get_device_count()):
-            dev_info = self.pa.get_device_info_by_index(i)
-            if dev_info.get("hostApi") == api_index:
-                name = dev_info.get("name", "")
-                inputs = dev_info.get("maxInputChannels")
-                if inputs > 0 and "loopback" in name.lower():
+            device = self.pa.get_default_wasapi_loopback()
+            return device["index"]
+        except Exception as e:
+            print(f"[!] Could not get default WASAPI loopback: {e}")
+            
+            # Fallback iteration
+            for i in range(self.pa.get_device_count()):
+                dev_info = self.pa.get_device_info_by_index(i)
+                if dev_info.get("isLoopbackDevice", False):
                     return i
-        return None
+            return None
 
     def start_capture(self, interviewer_idx=None, user_idx=None):
         """

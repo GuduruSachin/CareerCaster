@@ -50,7 +50,7 @@ protobuf==7.34.1
 pyarrow==23.0.1
 pyasn1==0.6.3
 pyasn1_modules==0.4.2
-PyAudio==0.2.14
+PyAudioWPatch==0.2.12.post4
 pycparser==3.0
 pydantic==2.13.3
 pydantic_core==2.46.3

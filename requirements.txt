@@ -11,7 +11,7 @@ cryptography==42.0.5
 requests==2.33.1
 
 # --- AUDIO & STEALTH ENGINE ---
-pyaudio==0.2.14
+pyaudiowpatch>=0.2.12
 numpy==2.2.3
 av==17.0.1
 faster-whisper==1.2.1

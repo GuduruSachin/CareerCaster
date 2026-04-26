@@ -1,4 +1,4 @@
-import pyaudio
+import pyaudiowpatch as pyaudio
 import logging
 import numpy as np
 
@@ -46,9 +46,11 @@ class AudioScanner:
                         "rate": int(dev_info.get("defaultSampleRate"))
                     }
                     
-                    # Heuristic for sorting
+                    # Use PyAudioWPatch's native property or fallback to heuristic
+                    is_loopback = dev_info.get("isLoopbackDevice", False)
                     name_lower = device_data["name"].lower()
-                    if "loopback" in name_lower or "stereo mix" in name_lower:
+                    
+                    if is_loopback or "loopback" in name_lower or "stereo mix" in name_lower:
                         devices["loopback"].append(device_data)
                     else:
                         devices["mics"].append(device_data)
