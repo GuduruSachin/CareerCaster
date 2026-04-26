@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CareerCaster Design Preview</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0B0D11; }
+        .glass { background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/javascript">
+        const { useState, useEffect } = React;
+
+        function GreenRoomPreview() {
+            return (
+                React.createElement('div', { className: "min-h-screen p-8 text-[#A0AAB7] flex justify-center" },
+                    React.createElement('div', { className: "w-full max-w-xl space-y-8" },
+                        
+                        // Header
+                        React.createElement('header', { className: "mb-10" },
+                            React.createElement('p', { className: "text-[#00E5FF] font-black text-[11px] tracking-[2.5px] uppercase mb-1" }, "Interview Assistant"),
+                            React.createElement('h1', { className: "text-4xl font-black text-white tracking-tighter uppercase" }, "CareerCaster")
+                        ),
+
+                        // Section: Audio
+                        React.createElement('div', { className: "bg-[#161A21] border border-[#252A34] rounded-[18px] p-6 space-y-6 hover:border-[#303743] transition-colors shadow-2xl" },
+                            React.createElement('h2', { className: "text-[#00E5FF] font-extrabold text-[11px] tracking-[1.5px] uppercase" }, "System Audio Setup"),
+                            
+                            // Track 1
+                            React.createElement('div', { className: "space-y-3" },
+                                React.createElement('label', { className: "text-[11px] font-bold text-[#6B7280] uppercase tracking-wider" }, "Interviewer Source (Output Loopback)"),
+                                React.createElement('div', { className: "w-full bg-[#1C222D] border border-[#313948] rounded-xl px-4 py-3.5 flex items-center justify-between text-white text-sm" },
+                                    React.createElement('span', null, "Stereo Mix (Realtek(R) Audio)"),
+                                    React.createElement('svg', { className: "w-4 h-4 text-gray-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" }, 
+                                        React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" })
+                                    )
+                                ),
+                                React.createElement('div', { className: "h-[5px] bg-[#0D1014] border border-[#1C222D] rounded-full overflow-hidden" },
+                                    React.createElement('div', { className: "h-full bg-[#00E5FF] w-[45%]" })
+                                )
+                            ),
+
+                            // Track 2
+                            React.createElement('div', { className: "space-y-3" },
+                                React.createElement('label', { className: "text-[11px] font-bold text-[#6B7280] uppercase tracking-wider" }, "Your Microphone Source"),
+                                React.createElement('div', { className: "w-full bg-[#1C222D] border border-[#313948] rounded-xl px-4 py-3.5 flex items-center justify-between text-white text-sm" },
+                                    React.createElement('span', null, "Microphone Array (Intel Smart Sound)"),
+                                    React.createElement('svg', { className: "w-4 h-4 text-gray-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" }, 
+                                        React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" })
+                                    )
+                                ),
+                                React.createElement('div', { className: "h-[5px] bg-[#0D1014] border border-[#1C222D] rounded-full overflow-hidden" },
+                                    React.createElement('div', { className: "h-full bg-[#00E5FF] w-[15%]" })
+                                )
+                            )
+                        ),
+
+                        // Section: Profile
+                        React.createElement('div', { className: "bg-[#161A21] border border-[#252A34] rounded-[18px] p-6 space-y-4 shadow-xl" },
+                            React.createElement('h2', { className: "text-[#00E5FF] font-extrabold text-[11px] tracking-[1.5px] uppercase" }, "Interview Data Summary"),
+                            React.createElement('div', { className: "space-y-1.5" },
+                                React.createElement('p', { className: "text-[15px] font-semibold text-white uppercase" }, 
+                                    "Identified Candidate: ", 
+                                    React.createElement('span', { className: "text-cyan-400 font-bold ml-2" }, "Pravalika")
+                                ),
+                                React.createElement('p', { className: "text-[15px] font-semibold text-white uppercase" }, 
+                                    "Target Position: ", 
+                                    React.createElement('span', { className: "text-white font-bold ml-2" }, "Software Engineer")
+                                )
+                            ),
+                            React.createElement('div', { className: "flex items-center gap-2 mt-4" },
+                                React.createElement('div', { className: "w-2 h-2 rounded-full bg-[#10B981] animate-pulse" }),
+                                React.createElement('p', { className: "text-[10px] font-black text-[#10B981] tracking-wider" }, "RESUME CONTEXT LOADED")
+                            )
+                        ),
+
+                        // Section: AI
+                        React.createElement('div', { className: "bg-[#161A21] border border-[#252A34] rounded-[18px] p-6 space-y-6 shadow-xl" },
+                            React.createElement('h2', { className: "text-[#00E5FF] font-extrabold text-[11px] tracking-[1.5px] uppercase" }, "AI Co-Pilot Config"),
+                            React.createElement('div', { className: "flex items-center gap-6" },
+                                React.createElement('div', { className: "flex-1 bg-[#1C222D] border border-[#313948] rounded-xl px-4 py-3.5 flex items-center justify-between text-white text-sm" },
+                                    React.createElement('span', null, "gemini-3-flash-preview"),
+                                    React.createElement('svg', { className: "w-4 h-4 text-gray-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" }, 
+                                        React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" })
+                                    )
+                                ),
+                                React.createElement('div', { className: "flex flex-col gap-1 pr-2" },
+                                    React.createElement('span', { className: "font-mono text-[11px] font-bold text-[#10B981]" }, "SECURE (45ms)"),
+                                    React.createElement('div', { className: "w-[35px] h-1 bg-[#00FF7F] rounded-full" })
+                                )
+                            ),
+                            React.createElement('div', { className: "flex items-center gap-3 pt-2" },
+                                React.createElement('div', { className: "w-5 h-5 bg-[#00E5FF] rounded-md flex items-center justify-center" },
+                                    React.createElement('svg', { className: "w-3.5 h-3.5 text-black", fill: "currentColor", viewBox: "0 0 20 20" }, 
+                                        React.createElement('path', { d: "M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" })
+                                    )
+                                ),
+                                React.createElement('span', { className: "text-xs font-semibold text-[#8F9BA8]" }, "HIDE INTERFACE ON START (STEALTH MODE)")
+                            )
+                        ),
+
+                        // Action
+                        React.createElement('div', { className: "pt-6 flex flex-col items-center gap-5" },
+                            React.createElement('button', { className: "w-full bg-gradient-to-r from-[#00E5FF] to-[#00A3FF] py-5 rounded-2xl text-black font-black uppercase tracking-[2px] text-[15px] hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-cyan-500/20" }, "Finalize & Start Co-Pilot"),
+                            React.createElement('p', { className: "text-[10px] font-bold text-[#383B42] tracking-[1.5px] uppercase" }, "Secure Encrypted Session • v1.8 Pro")
+                        )
+                    )
+                )
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(GreenRoomPreview));
+    </script>
+</body>
+</html>

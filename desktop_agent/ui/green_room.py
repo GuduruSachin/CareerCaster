@@ -5,7 +5,7 @@ import logging
 import threading
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QComboBox, QPushButton, QProgressBar, 
-                             QFrame, QScrollArea, QSizePolicy, QCheckBox)
+                             QFrame, QScrollArea, QSizePolicy, QCheckBox, QGridLayout)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 
@@ -57,8 +57,15 @@ class GreenRoom(QMainWindow):
         self.scroll_area.setStyleSheet("QScrollArea { border: none; background: #0A0A0A; }")
         self.scroll_area.setWidget(self.root_widget)
         self.setCentralWidget(self.scroll_area)
+
+        # 5. INITIALIZE STATE (Synchronous to prevent early access crashes)
+        self.api_key = None
+        self.active_model_name = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
+        self.api_latency = -1
+        self.available_models = []
+        self.devices = {"loopback": [], "mics": []}
  
-        # 5. ASYNC LOGIC TRIGGER (PREVENT STARTUP HANGS)
+        # 6. ASYNC LOGIC TRIGGER (PREVENT STARTUP HANGS)
         QTimer.singleShot(250, self.delayed_init)
 
     def delayed_init(self):
@@ -66,13 +73,14 @@ class GreenRoom(QMainWindow):
         # AI Logic Sync (IO Bound)
         try:
             self.api_key = get_master_api_key()
-        except:
+        except Exception as e:
+            LOGGER.error(f"Failed to retrieve API key: {e}")
             self.api_key = None
             
-        self.active_model_name = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
-        
         # Hardware Setup
         try:
+            from agent_core.audio_scanner import AudioScanner
+            from agent_core.audio_capture import AudioCaptureEngine
             self.scanner = AudioScanner()
             self.audio_engine = AudioCaptureEngine()
             self.devices = self.scanner.get_wasapi_devices() or {"loopback": [], "mics": []}
@@ -80,10 +88,6 @@ class GreenRoom(QMainWindow):
             LOGGER.error(f"Hardware initialization failed: {e}")
             self.devices = {"loopback": [], "mics": []}
         
-        # State
-        self.api_latency = -1
-        self.available_models = []
-
         # Initial context refresh (Safe: atoms are anchored)
         self.refresh_context()
 
@@ -106,107 +110,238 @@ class GreenRoom(QMainWindow):
         self.on_device_selection_changed()
 
     def setup_stylesheet(self):
-        self.setStyleSheet(f"""
-            QMainWindow, QScrollArea#MainScrollArea, QWidget#MainScrollArea > QWidget {{ 
-                background-color: #0A0A0A; 
-            }}
-            QLabel {{ color: #E0E0E0; font-family: 'Segoe UI'; }}
-            QComboBox {{ 
-                background-color: #1A1A1A; color: white; border: 1px solid #333; 
-                padding: 8px; border-radius: 4px; font-size: 13px;
-            }}
-            QPushButton {{ 
-                background-color: #00FFFF; color: black; font-weight: bold; 
-                padding: 12px; border-radius: 6px; border: none; font-size: 14px;
-            }}
-            QPushButton:disabled {{ background-color: #333; color: #666; }}
-            QPushButton:hover:!disabled {{ background-color: #00D1D1; }}
-            QProgressBar {{ 
-                border: 1px solid #222; background-color: #111; 
-                border-radius: 3px; text-align: center; height: 12px; 
-            }}
-            QProgressBar::chunk {{ background-color: #00FFFF; }}
+        """Solid-State Professional Theme - High Reliability & Contrast."""
+        self.setStyleSheet("""
+            QMainWindow, QScrollArea, QWidget#MainContainer {
+                background-color: #0B0D11;
+                border: none;
+            }
+            QScrollArea { border: none; }
             
-            /* Tactical Switch */
-            QCheckBox {{ color: #E0E0E0; spacing: 10px; font-size: 13px; }}
-            QCheckBox::indicator {{ width: 18px; height: 18px; background-color: #1A1A1A; border: 1px solid #333; border-radius: 3px; }}
-            QCheckBox::indicator:checked {{ background-color: #00FFFF; }}
- 
-            /* Stealth Scrollbar */
-            QScrollBar:vertical {{ border: none; background: #0A0A0A; width: 10px; }}
-            QScrollBar::handle:vertical {{ background: #333333; min-height: 20px; border-radius: 5px; }}
-            QScrollBar::handle:vertical:hover {{ background: #00FFFF; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+            /* Labels */
+            QLabel {
+                color: #A0AAB7;
+                font-family: 'Segoe UI', system-ui;
+                font-size: 13px;
+                background: transparent;
+            }
+            
+            /* High-Visibility Section Headers */
+            QLabel#SectionHeader {
+                color: #00E5FF;
+                font-weight: 800;
+                font-size: 11px;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                margin-bottom: 5px;
+            }
+            
+            /* Data Display */
+            QLabel#DataValue {
+                color: #FFFFFF;
+                font-size: 15px;
+                font-weight: 600;
+            }
+
+            /* Solid Professional Cards */
+            QFrame#ControlCard {
+                background-color: #161A21;
+                border: 1px solid #252A34;
+                border-radius: 12px;
+            }
+            QFrame#ControlCard:hover {
+                border: 1px solid #303743;
+            }
+
+            /* Component Overrides */
+            QComboBox {
+                background-color: #1C222D;
+                border: 1px solid #313948;
+                border-radius: 8px;
+                padding: 12px 15px;
+                color: #FFFFFF;
+                font-size: 13px;
+            }
+            QComboBox:hover { border: 1px solid #445065; }
+            QComboBox QAbstractItemView {
+                background-color: #1C222D;
+                color: white;
+                selection-background-color: #00E5FF;
+                selection-color: black;
+            }
+
+            QProgressBar {
+                background-color: #0D1014;
+                border: 1px solid #1C222D;
+                border-radius: 3px;
+                height: 5px;
+                text-align: center;
+                color: transparent;
+            }
+            QProgressBar::chunk {
+                background-color: #00E5FF;
+                border-radius: 2px;
+            }
+
+            /* Main Action Button */
+            QPushButton#ActionBtn {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #00A3FF);
+                color: #000000;
+                font-weight: 800;
+                font-size: 15px;
+                border-radius: 12px;
+                padding: 20px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            QPushButton#ActionBtn:hover {
+                background: #00FBFF;
+            }
+            QPushButton#ActionBtn:disabled {
+                background: #252A34;
+                color: #4C566A;
+                border: 1px solid #252A34;
+            }
+            
+            QCheckBox { color: #8F9BA8; font-size: 12px; spacing: 10px; }
+            QCheckBox::indicator { width: 20px; height: 20px; border-radius: 5px; border: 1px solid #313948; background: #1C222D; }
+            QCheckBox::indicator:checked { background-color: #00E5FF; border: 1px solid #00E5FF; }
+
+            /* Professional Scrollbar */
+            QScrollBar:vertical { background: #0B0D11; width: 10px; margin: 0; }
+            QScrollBar::handle:vertical { background: #1C222D; border-radius: 5px; min-height: 30px; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         """)
 
     def init_ui_sections(self):
-        # HEADER
-        header = QLabel("COMMAND CENTER v1.7")
-        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif;")
+        """Construct a clean, professional bento-style setup screen."""
+        # --- 1. BRANDING HEADER ---
+        header = QWidget()
+        header_lay = QVBoxLayout(header)
+        header_lay.setContentsMargins(0, 0, 0, 30)
+        
+        pre_title = QLabel("INTERVIEW ASSISTANT")
+        pre_title.setObjectName("SectionHeader")
+        
+        main_title = QLabel("CAREERCASTER")
+        main_title.setStyleSheet("font-size: 34px; font-weight: 900; color: #FFFFFF; letter-spacing: -1.5px;")
+        
+        header_lay.addWidget(pre_title)
+        header_lay.addWidget(main_title)
         self.root_layout.addWidget(header)
-        
-        # --- AUDIO MATRIX ---
-        audio_frame = QFrame()
-        audio_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
-        audio_layout = QVBoxLayout(audio_frame)
-        stitle_audio = QLabel("AUDIO MATRIX")
-        stitle_audio.setStyleSheet("font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px;")
-        audio_layout.addWidget(stitle_audio)
-        
-        audio_layout.addWidget(QLabel("Interviewer (WASAPI Loopback):"))
+
+        # --- 2. AUDIO HARDWARE SECTION ---
+        audio_card = QFrame()
+        audio_card.setObjectName("ControlCard")
+        audio_lay = QVBoxLayout(audio_card)
+        audio_lay.setContentsMargins(25, 25, 25, 25)
+        audio_lay.setSpacing(20)
+
+        h_audio = QLabel("SYSTEM AUDIO SETUP")
+        h_audio.setObjectName("SectionHeader")
+        audio_lay.addWidget(h_audio)
+
+        # Output Monitor
+        v_out = QVBoxLayout()
+        v_out.setSpacing(8)
+        lbl_out = QLabel("INTERVIEWER SOURCE (Speakers/Headphones)")
+        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 11px;")
+        v_out.addWidget(lbl_out)
         self.itv_combo = QComboBox()
-        audio_layout.addWidget(self.itv_combo)
+        v_out.addWidget(self.itv_combo)
         self.itv_meter = QProgressBar()
-        audio_layout.addWidget(self.itv_meter)
-        
-        audio_layout.addSpacing(10)
-        audio_layout.addWidget(QLabel("Mic (Standard Input):"))
+        v_out.addWidget(self.itv_meter)
+        audio_lay.addLayout(v_out)
+
+        # Input Monitor
+        v_in = QVBoxLayout()
+        v_in.setSpacing(8)
+        lbl_in = QLabel("YOUR MICROPHONE SOURCE")
+        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 11px;")
+        v_in.addWidget(lbl_in)
         self.mic_combo = QComboBox()
-        audio_layout.addWidget(self.mic_combo)
+        v_in.addWidget(self.mic_combo)
         self.mic_meter = QProgressBar()
-        audio_layout.addWidget(self.mic_meter)
-        self.root_layout.addWidget(audio_frame)
-
-        # --- TACTICAL SETTINGS ---
-        settings_frame = QFrame()
-        settings_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
-        settings_layout = QVBoxLayout(settings_frame)
-        stitle_settings = QLabel("TACTICAL SETTINGS")
-        stitle_settings.setStyleSheet("font-size: 12px; color: #AAAAAA; text-transform: uppercase; letter-spacing: 1px;")
-        settings_layout.addWidget(stitle_settings)
+        v_in.addWidget(self.mic_meter)
+        audio_lay.addLayout(v_in)
         
-        settings_layout.addWidget(QLabel("Active AI Model:"))
+        self.root_layout.addWidget(audio_card)
+
+        # --- 3. SESSION CONTEXT SECTION ---
+        session_card = QFrame()
+        session_card.setObjectName("ControlCard")
+        session_lay = QVBoxLayout(session_card)
+        session_lay.setContentsMargins(25, 25, 25, 25)
+        session_lay.setSpacing(12)
+
+        h_session = QLabel("INTERVIEW DATA SUMMARY")
+        h_session.setObjectName("SectionHeader")
+        session_lay.addWidget(h_session)
+
+        self.candidate_label = QLabel("IDENTIFIED CANDIDATE: ...")
+        self.candidate_label.setObjectName("DataValue")
+        self.role_label = QLabel("TARGET POSITION: ...")
+        self.role_label.setObjectName("DataValue")
+        
+        session_lay.addWidget(self.candidate_label)
+        session_lay.addWidget(self.role_label)
+        
+        self.context_status = QLabel("● RESUME CONTEXT LOADED")
+        self.context_status.setStyleSheet("color: #10B981; font-weight: 800; font-size: 10px; margin-top: 5px;")
+        session_lay.addWidget(self.context_status)
+        
+        self.root_layout.addWidget(session_card)
+
+        # --- 4. AI CONFIGURATION SECTION ---
+        ai_card = QFrame()
+        ai_card.setObjectName("ControlCard")
+        ai_lay = QVBoxLayout(ai_card)
+        ai_lay.setContentsMargins(25, 25, 25, 25)
+        ai_lay.setSpacing(15)
+
+        h_ai = QLabel("AI CO-PILOT CONFIG")
+        h_ai.setObjectName("SectionHeader")
+        ai_lay.addWidget(h_ai)
+
+        ai_row = QHBoxLayout()
         self.model_selector = QComboBox()
-        self.model_selector.addItem("Discovering AI Engines...", -1)
-        self.model_selector.setEnabled(False)
-        settings_layout.addWidget(self.model_selector)
+        self.model_selector.setMinimumWidth(250)
+        ai_row.addWidget(self.model_selector)
         
-        self.stealth_toggle = QCheckBox("Enable Stealth Overlay (Screen Masking)")
-        self.stealth_toggle.setChecked(not self.session_data.get("disable_stealth", False))
-        settings_layout.addWidget(self.stealth_toggle)
-        
-        self.root_layout.addWidget(settings_frame)
-
-        # --- AI HEALTH ---
-        ai_frame = QFrame()
-        ai_frame.setStyleSheet("background-color: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px;")
-        ai_layout = QHBoxLayout(ai_frame)
+        stat_box = QVBoxLayout()
+        stat_box.setSpacing(4)
+        self.status_msg = QLabel("CONNECTING...")
+        self.status_msg.setStyleSheet("font-family: 'Consolas', monospace; font-size: 11px; color: #4B5563; font-weight: bold;")
         self.status_led = QLabel()
-        self.status_led.setFixedSize(12, 12)
-        self.status_led.setStyleSheet("background-color: #555555; border-radius: 6px;")
-        self.latency_label = QLabel("AI STATUS: INITIALIZING...")
-        ai_layout.addWidget(self.status_led)
-        ai_layout.addWidget(self.latency_label)
-        ai_layout.addStretch()
-        self.root_layout.addWidget(ai_frame)
+        self.status_led.setFixedSize(35, 4)
+        self.status_led.setStyleSheet("background: #313948; border-radius: 2px;")
+        stat_box.addWidget(self.status_msg)
+        stat_box.addWidget(self.status_led)
+        
+        ai_row.addLayout(stat_box)
+        ai_row.addStretch()
+        ai_lay.addLayout(ai_row)
 
-        # --- FOOTER ---
-        self.start_btn = QPushButton("ENGAGE INTERVIEW")
-        self.start_btn.setFixedHeight(55)
+        self.stealth_toggle = QCheckBox("HIDE INTERFACE ON START (STEALTH MODE)")
+        self.stealth_toggle.setChecked(not self.session_data.get("disable_stealth", False))
+        ai_lay.addWidget(self.stealth_toggle)
+
+        self.root_layout.addWidget(ai_card)
+
+        # --- 5. INITIALIZE ACTION ---
+        self.root_layout.addStretch()
+        
+        self.start_btn = QPushButton("FINALIZE & START COPILOT")
+        self.start_btn.setObjectName("ActionBtn")
         self.start_btn.setEnabled(False)
+        self.start_btn.setMinimumHeight(65)
         self.start_btn.clicked.connect(self.finalize_and_start)
         self.root_layout.addWidget(self.start_btn)
-        self.root_layout.addStretch()
+
+        foot = QLabel("SECURE ENCRYPTED SESSION • v1.8 PRO")
+        foot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        foot.setStyleSheet("color: #4B5563; font-size: 10px; font-weight: bold; margin-top: 15px;")
+        self.root_layout.addWidget(foot)
 
     def discover_ai_models(self):
         """V1.7: Auto-Tests AI connectivity and identifies available models."""
@@ -243,13 +378,15 @@ class GreenRoom(QMainWindow):
         if self.active_model_name in self.available_models:
             self.model_selector.setCurrentText(self.active_model_name)
             
-        self.status_led.setStyleSheet("background-color: #00FF7F; border-radius: 6px;")
-        self.latency_label.setText(f"AI STATUS: SECURE ({self.api_latency}ms)")
+        self.status_led.setStyleSheet("background-color: #00FF7F; border-radius: 2px;")
+        self.status_msg.setText(f"SECURE ({self.api_latency}ms)")
+        self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #00FF88; font-weight: bold; font-size: 11px;")
         self.validate_all()
 
     def on_ai_fail(self, err):
-        self.status_led.setStyleSheet("background-color: #FF4500; border-radius: 6px;")
-        self.latency_label.setText(f"AI STATUS: OFFLINE ({err[:25]})")
+        self.status_led.setStyleSheet("background-color: #FF4500; border-radius: 2px;")
+        self.status_msg.setText(f"OFFLINE ({err[:25]})")
+        self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #FF4500; font-weight: bold; font-size: 11px;")
         self.validate_all()
 
     def on_model_changed(self, name):
@@ -297,8 +434,10 @@ class GreenRoom(QMainWindow):
     def validate_all(self):
         if not hasattr(self, 'root_layout'): return
         if not hasattr(self, 'start_btn') or self.start_btn is None: return
-        has_itv = self.itv_combo.currentData() != -1
-        has_mic = self.mic_combo.currentData() != -1
+        if not hasattr(self, 'api_latency'): return
+        
+        has_itv = hasattr(self, 'itv_combo') and self.itv_combo.currentData() != -1
+        has_mic = hasattr(self, 'mic_combo') and self.mic_combo.currentData() != -1
         has_ai = self.api_latency != -1
         has_context = len(self.session_data.get("resume_data", "")) > 50
         self.start_btn.setEnabled(has_itv and has_mic and has_ai and has_context)
@@ -318,5 +457,13 @@ class GreenRoom(QMainWindow):
         if not hasattr(self, 'root_layout'): return
         if not hasattr(self, 'session_data'): return
         name = self.session_data.get("candidate_name") or self.session_data.get("user_name", "Candidate")
-        self.setWindowTitle(f"CareerCaster Pro | {name}")
+        role = self.session_data.get("target_role") or "Target Performance"
+        
+        self.setWindowTitle(f"CAREERCASTER | {name.upper()}")
+        
+        if hasattr(self, 'candidate_label'):
+            self.candidate_label.setText(f"IDENTIFIED CANDIDATE: <b>{name.upper()}</b>")
+        if hasattr(self, 'role_label'):
+            self.role_label.setText(f"TARGET POSITION: <b>{role.upper()}</b>")
+            
         self.validate_all()

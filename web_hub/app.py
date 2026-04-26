@@ -39,8 +39,28 @@ if "resume_text" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
 
-st.title("💼 CareerCaster: Web Hub v1.7")
-st.markdown("The Bridge: Move all tactical control to the local desktop agent.")
+# --- Design Preview Loader ---
+if st.sidebar.checkbox("🎨 Show UI Design Preview", False):
+    st.subheader("Design Preview: CareerCaster v1.8 Specialist Interface")
+    try:
+        with open(os.path.join(PROJECT_ROOT, "design_preview", "index.html"), "r", encoding="utf-8") as f:
+            html_content = f.read()
+            st.components.v1.html(html_content, height=850, scrolling=True)
+            st.stop()
+    except Exception as e:
+        st.error(f"Could not load design preview: {e}")
+
+# --- Design Preview Loader (Mandatory for Review) ---
+# try:
+#     with open(os.path.join(PROJECT_ROOT, "design_preview", "index.html"), "r", encoding="utf-8") as f:
+#         html_content = f.read()
+#         st.components.v1.html(html_content, height=950, scrolling=True)
+#         st.info("💡 Note: This is an interactive design mockup of the Specialist Python UI. Local system connection features are active in the desktop agent.")
+#         st.divider()
+# except Exception as e:
+#     st.error(f"Could not load design preview: {e}")
+
+st.title("💼 CareerCaster: Web Hub v1.8")
 
 # --- Sidebar: Simplified Account Status ---
 with st.sidebar:
@@ -126,7 +146,8 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
                 
                 if os.path.exists(exe_path):
                     launch_cmd = [exe_path, abs_session_path]
-                    st.info("Auto-Launching CareerCaster Pro (EXE)...")
+                    st.info(f"Auto-Launching CareerCaster Pro (EXE)...")
+                    print(f"Bridgeing to EXE: {launch_cmd}")
                     subprocess.Popen(
                         launch_cmd, 
                         creationflags=launch_flags, 
@@ -136,14 +157,16 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
                 else:
                     # In Dev mode, use the start command to ensure Environment inheritance (GEMINI_API_KEY)
                     if sys.platform == "win32":
-                        # We use start "" /b cmd /c to run in background shell but inherit env correctly
-                        # The "" is a dummy title to prevent path parsing errors in start command
-                        launch_cmd = f'start "" /b cmd /c "{sys.executable} {agent_path} {abs_session_path}"'
-                        st.warning("EXE not found. Auto-Launching via Shell Context...")
+                        # v1.7.7: Fix path quoting for spaces in PROJECT_ROOT or session paths
+                        # Using "" title dummy and nested quotes for cmd /c
+                        launch_cmd = f'start "" /b cmd /c ""{sys.executable}" "{agent_path}" "{abs_session_path}""'
+                        st.warning("EXE not found. Auto-Launching via Shell Context (Debug Mode)...")
+                        print(f"Launching Agent Shell: {launch_cmd}")
                         subprocess.Popen(launch_cmd, shell=True, env=os.environ.copy())
                     else:
                         launch_cmd = [sys.executable, agent_path, abs_session_path]
                         st.warning("EXE not found. Auto-Launching via Python...")
+                        print(f"Launching Agent: {launch_cmd}")
                         subprocess.Popen(launch_cmd, close_fds=True, env=os.environ.copy())
                 
                 st.balloons()

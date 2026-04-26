@@ -1,5 +1,25 @@
 import sys
 import os
+
+# --- v1.7.7 ABSOLUTE PATH INJECTION (MANDATORY FOR MONOREPO) ---
+# 1. Identify script location
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 2. Identify Project Root (One level up)
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+
+# 3. Handle PyInstaller Bundle Directory
+if getattr(sys, 'frozen', False):
+    BUNDLE_DIR = sys._MEIPASS
+    if BUNDLE_DIR not in sys.path:
+        sys.path.insert(0, BUNDLE_DIR)
+else:
+    # 4. Inject Project Root into sys.path at index 0
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+    # 5. Inject Current Dir for UI/Agent modules
+    if CURRENT_DIR not in sys.path:
+        sys.path.insert(0, CURRENT_DIR)
+
 import types
 import warnings
 
@@ -28,28 +48,6 @@ MUTEX_LOCK = None
 LOGGER = None
 HEARTBEAT_COUNT = 0
 SESSION_DATA = {}
-
-# --- ARCHITECTURAL IMPORT STABILIZATION & PATH ROBUSTNESS ---
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.normpath(os.path.join(base_path, relative_path))
-
-BUNDLE_DIR = resource_path("")
-
-# Mandatory Path Injection for EXE/Script dual-mode
-if BUNDLE_DIR not in sys.path:
-    sys.path.insert(0, BUNDLE_DIR)
-
-# Priority: Project Root (for shared /core security/paths)
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else BUNDLE_DIR
-PARENT_DIR = os.path.dirname(PROJECT_ROOT)
-if PARENT_DIR not in sys.path:
-    sys.path.insert(0, PARENT_DIR)
 
 import json
 from core.security import SecurityManager
