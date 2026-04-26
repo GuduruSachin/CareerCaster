@@ -27,7 +27,7 @@ class GreenRoom(QMainWindow):
     CareerCaster v1.7 - Intelligent Command Center.
     Centralizes all AI reasoning and hardware control.
     """
-    ready_to_start = pyqtSignal(dict)
+    ready_to_start = pyqtSignal(dict, dict)
 
     def __init__(self, session_data=None):
         super().__init__()
@@ -231,106 +231,101 @@ class GreenRoom(QMainWindow):
         self.root_layout.addWidget(header)
 
         # --- 2. AUDIO HARDWARE SECTION ---
-        audio_card = QFrame()
-        audio_card.setObjectName("ControlCard")
-        audio_lay = QVBoxLayout(audio_card)
-        audio_lay.setContentsMargins(25, 25, 25, 25)
-        audio_lay.setSpacing(25)
+        self.audio_card = QFrame()
+        self.audio_card.setObjectName("ControlCard")
+        self.audio_card.setMinimumHeight(350)
+        audio_lay = QVBoxLayout(self.audio_card)
+        audio_lay.setContentsMargins(30, 30, 30, 30)
+        audio_lay.setSpacing(15)
 
-        h_audio = QLabel("Audio Setup")
+        h_audio = QLabel("AUDIO HARDWARE SETUP")
         h_audio.setObjectName("SectionHeader")
-        h_audio.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
         audio_lay.addWidget(h_audio)
 
-        # Output Monitor
-        v_out = QVBoxLayout()
-        v_out.setSpacing(12)
-        lbl_out = QLabel("INTERVIEWER SOURCE")
-        lbl_out.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 1.2px;")
-        v_out.addWidget(lbl_out)
+        # Output Monitor (Loopback)
+        itv_box = QVBoxLayout()
+        itv_box.setSpacing(10)
+        
+        lbl_out = QLabel("INTERVIEWER SOURCE (LOOPBACK)")
+        lbl_out.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        itv_box.addWidget(lbl_out)
+        
         self.itv_combo = QComboBox()
-        v_out.addWidget(self.itv_combo)
+        self.itv_combo.setMinimumHeight(48)
+        itv_box.addWidget(self.itv_combo)
+        
         self.itv_meter = QProgressBar()
-        v_out.addWidget(self.itv_meter)
-        audio_lay.addLayout(v_out)
+        self.itv_meter.setMinimumHeight(6)
+        itv_box.addWidget(self.itv_meter)
+        
+        audio_lay.addLayout(itv_box)
+        audio_lay.addSpacing(15)
 
-        # Input Monitor
-        v_in = QVBoxLayout()
-        v_in.setSpacing(12)
+        # Input Monitor (Microphone)
+        mic_box = QVBoxLayout()
+        mic_box.setSpacing(10)
+        
         lbl_in = QLabel("YOUR MICROPHONE")
-        lbl_in.setStyleSheet("color: #6B7280; font-weight: 700; font-size: 10px; letter-spacing: 1.2px;")
-        v_in.addWidget(lbl_in)
+        lbl_in.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        mic_box.addWidget(lbl_in)
+        
         self.mic_combo = QComboBox()
-        v_in.addWidget(self.mic_combo)
+        self.mic_combo.setMinimumHeight(48)
+        mic_box.addWidget(self.mic_combo)
+        
         self.mic_meter = QProgressBar()
-        v_in.addWidget(self.mic_meter)
-        audio_lay.addLayout(v_in)
+        self.mic_meter.setMinimumHeight(6)
+        mic_box.addWidget(self.mic_meter)
         
-        self.root_layout.addWidget(audio_card)
+        audio_lay.addLayout(mic_box)
+        
+        self.root_layout.addWidget(self.audio_card)
 
-        # --- 3. SESSION INTEL SECTION ---
-        intel_card = QFrame()
-        intel_card.setObjectName("ControlCard")
-        intel_lay = QVBoxLayout(intel_card)
-        intel_lay.setContentsMargins(25, 25, 25, 25)
-        intel_lay.setSpacing(15)
-
-        h_intel = QLabel("Target Intel")
-        h_intel.setObjectName("SectionHeader")
-        h_intel.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
-        intel_lay.addWidget(h_intel)
-
-        name = self.session_data.get("candidate_name", "Candidate")
-        role = self.session_data.get("target_role", "Target Position")
-        
-        gl = QGridLayout()
-        gl.setSpacing(10)
-        
-        l1 = QLabel("CANDIDATE"); l1.setStyleSheet("color: #4B5563; font-size: 9px; font-weight: 800; letter-spacing: 1px;")
-        v1 = QLabel(name.upper()); v1.setStyleSheet("color: #FFFFFF; font-size: 16px; font-weight: 800;")
-        
-        l2 = QLabel("POSITION"); l2.setStyleSheet("color: #4B5563; font-size: 9px; font-weight: 800; letter-spacing: 1px;")
-        v2 = QLabel(role.upper()); v2.setStyleSheet("color: #FFFFFF; font-size: 14px; font-weight: 600;")
-        
-        gl.addWidget(l1, 0, 0); gl.addWidget(v1, 1, 0)
-        gl.addWidget(l2, 0, 1); gl.addWidget(v2, 1, 1)
-        
-        intel_lay.addLayout(gl)
-        self.root_layout.addWidget(intel_card)
-
-        # --- 4. AI CONFIGURATION SECTION ---
+        # --- 3. AI CONFIGURATION SECTION ---
         ai_card = QFrame()
         ai_card.setObjectName("ControlCard")
+        ai_card.setMinimumHeight(220)
         ai_lay = QVBoxLayout(ai_card)
-        ai_lay.setContentsMargins(25, 25, 25, 25)
-        ai_lay.setSpacing(25)
+        ai_lay.setContentsMargins(30, 30, 30, 30)
+        ai_lay.setSpacing(20)
 
-        h_ai = QLabel("AI Configuration")
+        h_ai = QLabel("AI INTELLIGENCE CONFIG")
         h_ai.setObjectName("SectionHeader")
-        h_ai.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
         ai_lay.addWidget(h_ai)
 
         ai_row = QHBoxLayout()
+        ai_row.setSpacing(15)
+        
+        v_model = QVBoxLayout()
+        v_model.setSpacing(8)
+        lbl_model = QLabel("REASONING ENGINE")
+        lbl_model.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        v_model.addWidget(lbl_model)
+        
         self.model_selector = QComboBox()
-        self.model_selector.setMinimumWidth(250)
-        ai_row.addWidget(self.model_selector)
+        self.model_selector.setMinimumHeight(48)
+        v_model.addWidget(self.model_selector)
+        ai_row.addLayout(v_model, 3)
         
         stat_box = QVBoxLayout()
-        stat_box.setSpacing(6)
-        self.status_msg = QLabel("CONNECTING...")
+        stat_box.setSpacing(8)
+        stat_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.status_msg = QLabel("WAITING...")
         self.status_msg.setStyleSheet("font-family: 'Consolas', monospace; font-size: 10px; color: #4B5563; font-weight: bold;")
         self.status_led = QLabel()
-        self.status_led.setFixedSize(40, 4)
-        self.status_led.setStyleSheet("background: #313948; border-radius: 2px;")
+        self.status_led.setFixedSize(60, 4)
+        self.status_led.setStyleSheet("background: #1A1A1A; border-radius: 2px;")
+        
         stat_box.addWidget(self.status_msg)
         stat_box.addWidget(self.status_led)
+        ai_row.addLayout(stat_box, 1)
         
-        ai_row.addLayout(stat_box)
-        ai_row.addStretch()
         ai_lay.addLayout(ai_row)
 
-        self.stealth_toggle = QCheckBox("HIDE INTERFACE ON START (STEALTH MODE)")
+        self.stealth_toggle = QCheckBox("HIDE INTERFACE ON LAUNCH (STEALTH MODE)")
         self.stealth_toggle.setChecked(not self.session_data.get("disable_stealth", False))
+        self.stealth_toggle.setMinimumHeight(30)
         ai_lay.addWidget(self.stealth_toggle)
 
         self.root_layout.addWidget(ai_card)
@@ -352,7 +347,7 @@ class GreenRoom(QMainWindow):
         self.root_layout.addWidget(foot)
 
     def discover_ai_models(self):
-        """v1.8.6: Hardened AI Discovery - Fast-Start with background verification."""
+        """v1.8.15: Latency-Driven Discovery - Only shows verified models, fastest first."""
         if not self.api_key:
             QTimer.singleShot(0, lambda: self.on_ai_fail("API Key Missing"))
             return
@@ -361,70 +356,91 @@ class GreenRoom(QMainWindow):
             try:
                 client = genai.Client(api_key=self.api_key)
                 
-                # 1. IMMEDIATE POPULATION: Fast-start with common models
-                # This ensures the dropdown is never empty
-                targets = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-                self.available_models = targets
-                QTimer.singleShot(0, self.on_ai_success)
+                # 1. Fetch Candidates (Broad Sweep)
+                candidates = [] # list of (short_name, full_name)
+                try:
+                    remote = client.models.list()
+                    for rm in remote:
+                        if "generateContent" in rm.supported_methods:
+                            m_full = rm.name
+                            m_short = m_full.split("/")[-1]
+                            # Filter for usable chat models
+                            if "vision" not in m_short and "embedding" not in m_short and "text" not in m_short:
+                                candidates.append((m_short, m_full))
+                except:
+                    # Fallback list if API call fails
+                    candidates = [("gemini-1.5-flash", "models/gemini-1.5-flash"), 
+                                 ("gemini-2.0-flash", "models/gemini-2.0-flash")]
+
+                # 2. Parallel Latency Verification
+                verified_results = [] # list of {"short":, "full":, "lat":}
+                verified_lock = threading.Lock()
                 
-                # 2. BACKGROUND VERIFICATION: Silently check which ones are actually responsive
-                verified_list = []
-                latency_map = {}
-                
-                def ping_model(m_id):
+                def ping_model(m_short, m_full):
                     try:
                         t0 = time.time()
-                        client.models.generate_content(model=m_id, contents="ping")
+                        client.models.generate_content(
+                            model=m_full, 
+                            contents="ping", 
+                            config={"max_output_tokens": 1}
+                        )
                         lat = int((time.time() - t0) * 1000)
-                        latency_map[m_id] = lat
-                        verified_list.append(m_id)
-                    except:
-                        pass
+                        with verified_lock:
+                            verified_results.append({"short": m_short, "full": m_full, "lat": lat})
+                    except Exception:
+                        pass 
+
+                # Prioritize testing
+                reliable_seeds = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+                test_set = sorted(candidates, key=lambda x: x[0] not in reliable_seeds)
                 
                 threads = []
-                for m in targets:
-                    t = threading.Thread(target=ping_model, args=(m,))
+                # Test top candidates in parallel
+                for m_short, m_full in test_set[:10]:
+                    t = threading.Thread(target=ping_model, args=(m_short, m_full))
                     t.daemon = True
                     t.start()
                     threads.append(t)
                 
-                # Wait for verification (max 2s)
+                # Wait for verification (max 2 seconds)
                 for t in threads: t.join(timeout=2.0)
                 
-                if verified_list:
-                    # Final sort based on real-world latency
-                    final_list = sorted(verified_list, key=lambda x: latency_map.get(x, 9999))
-                    self.available_models = final_list
-                    self.api_latency = min(latency_map.values()) if latency_map else 0
+                if verified_results:
+                    # Sort by latency ASC
+                    final_sorted = sorted(verified_results, key=lambda x: x["lat"])
+                    self.available_models = final_sorted # Store dicts now
+                    self.api_latency = final_sorted[0]["lat"]
                     QTimer.singleShot(0, self.on_ai_success)
-                
-                # 3. Dynamic Expansion (Deep Background)
-                try:
-                    remote = client.models.list()
-                    for rm in remote:
-                        m_name = rm.name.split("/")[-1]
-                        if m_name not in self.available_models and "generateContent" in rm.supported_methods:
-                            self.available_models.append(m_name)
-                    QTimer.singleShot(0, self.on_ai_success)
-                except: pass
+                else:
+                    QTimer.singleShot(0, lambda: self.on_ai_fail("No Models Connected"))
 
             except Exception as e:
-                LOGGER.error(f"AI Discovery Failure: {e}")
-                # We already showed the fallback list, so we don't call on_ai_fail unless critical
+                LOGGER.error(f"AI Discovery Fatal: {e}")
+                QTimer.singleShot(0, lambda: self.on_ai_fail("System Error"))
         
         threading.Thread(target=run_discovery, daemon=True).start()
 
     def on_ai_success(self):
+        """Populates the selector with verified models and selects the fastest one."""
         self.model_selector.clear()
-        self.model_selector.addItems(self.available_models)
-        self.model_selector.setEnabled(True)
         
-        if self.active_model_name in self.available_models:
-            self.model_selector.setCurrentText(self.active_model_name)
+        if not self.available_models:
+            self.on_ai_fail("Empty Discovery")
+            return
+
+        # self.available_models is a list of {"short":, "full":, "lat":}
+        for m in self.available_models:
+            self.model_selector.addItem(m["short"], m["full"])
+
+        self.model_selector.setCurrentIndex(0)
+        self.model_selector.setEnabled(True)
             
         self.status_led.setStyleSheet("background-color: #00FF7F; border-radius: 2px;")
-        self.status_msg.setText(f"SECURE ({self.api_latency}ms)")
+        self.status_msg.setText(f"FASTEST: {self.api_latency}ms")
         self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #00FF88; font-weight: bold; font-size: 11px;")
+        
+        # Save choice to session immediately (using the FULL name in itemData)
+        self.on_model_changed(self.model_selector.currentData())
         self.validate_all()
 
     def on_ai_fail(self, err):
@@ -433,10 +449,12 @@ class GreenRoom(QMainWindow):
         self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #FF4500; font-weight: bold; font-size: 11px;")
         self.validate_all()
 
-    def on_model_changed(self, name):
+    def on_model_changed(self, full_name):
+        # Triggered by currentTextChanged too? No, I should use currentIndexChanged for data access
+        if not full_name: return
         if 'active_model' not in self.session_data: self.session_data['active_model'] = {}
-        self.session_data['active_model']['name'] = name
-        LOGGER.info(f"Command Center: AI Model switched to {name}")
+        self.session_data['active_model']['name'] = full_name
+        LOGGER.info(f"Command Center: AI Model switched to {full_name}")
         self.validate_all()
 
     def populate_devices(self):
@@ -465,11 +483,17 @@ class GreenRoom(QMainWindow):
         self.audio_engine.stop_capture()
         itv_id = self.itv_combo.currentData()
         mic_id = self.mic_combo.currentData()
-        if itv_id != -1 or mic_id != -1:
-            self.audio_engine.start_capture(
-                interviewer_idx=itv_id if itv_id != -1 else None,
-                user_idx=mic_id if mic_id != -1 else None
-            )
+        
+        # v1.8.16: Robust mapping to ensure None is passed for system defaults
+        # itv_id or mic_id will be index ints, or -1 if "No device found"
+        # We only start if at least one side is possibly valid
+        itv_idx = itv_id if (itv_id is not None and itv_id != -1) else None
+        mic_idx = mic_id if (mic_id is not None and mic_id != -1) else None
+        
+        self.audio_engine.start_capture(
+            interviewer_idx=itv_idx,
+            user_idx=mic_idx
+        )
         self.validate_all()
 
     def update_meters(self):
@@ -492,21 +516,13 @@ class GreenRoom(QMainWindow):
         self.start_btn.setEnabled(has_itv and has_mic and has_ai and has_context)
 
     def finalize_and_start(self):
-        # Ensure we don't start until STT is ready
-        self.start_btn.setText("INITIALIZING CORE...")
+        # Improved Launch Logic: Don't block UI if pre-warm is already running
+        self.start_btn.setText("LAUNCHING...")
         self.start_btn.setEnabled(False)
-        
-        def check_and_launch():
-            from agent_core.stt_service import STTService
-            stt = STTService() # Singleton access
-            if stt.initialized:
-                QTimer.singleShot(0, self.do_launch)
-            else:
-                QTimer.singleShot(500, check_and_launch)
-        
-        check_and_launch()
+        self.do_launch()
 
     def do_launch(self):
+
         hw_config = {
             "interviewer_device_id": self.itv_combo.currentData(),
             "mic_device_id": self.mic_combo.currentData()
@@ -518,8 +534,8 @@ class GreenRoom(QMainWindow):
         self.meter_timer.stop()
         self.session_data['disable_stealth'] = not self.stealth_toggle.isChecked()
         
-        # v1.8.12: Emit hardware config specifically as the first argument
-        self.ready_to_start.emit(hw_config)
+        # v1.8.12: Emit both configs to maintain sync
+        self.ready_to_start.emit(hw_config, self.session_data)
 
     def prewarm_stt(self):
         """Pre-loads the heavy STT/Whisper models in the background."""

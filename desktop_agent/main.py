@@ -82,11 +82,14 @@ def run_heartbeat():
     if LOGGER:
         LOGGER.info(f"Layer 4.Refactor: Heartbeat #{HEARTBEAT_COUNT} - Loop Valid at {time.strftime('%H:%M:%S')}")
 
-def start_stealth_overlay(hardware_config):
+def start_stealth_overlay(hardware_config, updated_session_data):
     """Transition callback from Green Room to Stealth Overlay."""
     global MAIN_OVERLAY, GREEN_ROOM, SESSION_DATA
     if GREEN_ROOM:
         GREEN_ROOM.close()
+    
+    # Sync global session data with any changes made in Green Room (like model choice)
+    SESSION_DATA.update(updated_session_data)
     
     MAIN_OVERLAY = StealthOverlay(session_data=SESSION_DATA, hardware_config=hardware_config)
     MAIN_OVERLAY.show()
