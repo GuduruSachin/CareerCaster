@@ -113,13 +113,6 @@ def initialize_refined_skeleton():
     auth_error = None
     try:
         security = SecurityManager()
-        
-        # --- V1.7.9: SILERO VAD AUTO-RECOVERY ---
-        vad_path = os.path.join(CURRENT_DIR, "models", "silero_vad.jit")
-        if not os.path.exists(vad_path) or os.path.getsize(vad_path) < 500000:
-            LOGGER.info("[!] VAD Model missing or corrupt. Launching recovery...")
-            from download_vad import download_silero_vad
-            download_silero_vad()
 
         if len(sys.argv) > 1 and sys.argv[1].endswith('.cc'):
             session_path = os.path.normpath(os.path.abspath(sys.argv[1]))

@@ -102,22 +102,24 @@ if resume_file:
                 text = "".join([page.extract_text() or "" for page in reader.pages])
                 st.session_state.resume_text = text.strip()
                 st.session_state.last_uploaded = resume_file.name
-                
-                # --- v1.8.8: HARDENED AI EXTRACTION ---
                 if api_key and api_key != "YOUR_ENTERPRISE_API_KEY_HERE":
                     try:
                         from google import genai
                         client = genai.Client(api_key=api_key)
                         prompt = (
-                            "You are a professional resume parser. Extract the candidate's Full Name "
-                            "and the Target Job Title (or most recent role). "
-                            "Output VALID JSON ONLY: {\"name\": \"...\", \"role\": \"...\"}. "
+                            "You are an expert HR Parser. Extract from this resume: "
+                            "1. Candidate Name "
+                            "2. Target/Current Role "
+                            "3. Top 5 Technical Skills "
+                            "4. Years of total Experience (numeric) "
+                            "5. Highest Education Degree "
+                            "6. Most Recent Company "
+                            "Output VALID JSON ONLY: {\"name\": \"...\", \"role\": \"...\", \"skills\": [...], \"years\": \"...\", \"education\": \"...\", \"company\": \"...\"}. "
                             f"Resume Text:\n{st.session_state.resume_text[:4000]}"
                         )
                         response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
                         
                         if response.text:
-                            # Robust JSON cleanup
                             raw_text = response.text.strip()
                             if "```json" in raw_text:
                                 raw_text = raw_text.split("```json")[-1].split("```")[0].strip()
@@ -127,15 +129,33 @@ if resume_file:
                             data = json.loads(raw_text)
                             st.session_state.extracted_name = data.get("name", "Candidate").strip()
                             st.session_state.extracted_role = data.get("role", "Ready for CareerCaster").strip()
+                            st.session_state.extracted_skills = data.get("skills", [])
+                            st.session_state.extracted_years = data.get("years", "N/A")
+                            st.session_state.extracted_edu = data.get("education", "N/A")
+                            st.session_state.extracted_company = data.get("company", "N/A")
                             
                             if st.session_state.extracted_name != "Candidate":
-                                st.success(f"✅ Profile Verified: {st.session_state.extracted_name} | {st.session_state.extracted_role}")
+                                st.success("✅ AI Profile Construction Complete")
                     except Exception as ai_e:
                         print(f"Extraction failed: {ai_e}")
                         st.session_state.extracted_name = "Candidate"
                         st.session_state.extracted_role = "Ready for Session"
             except Exception as e:
                 st.error(f"Error reading PDF: {e}")
+
+if st.session_state.extracted_name:
+    with st.expander("🎯 **Candidate Intelligence Profile**", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Name", st.session_state.extracted_name)
+            st.write(f"**Role:** {st.session_state.extracted_role}")
+        with col2:
+            st.metric("Experience", f"{st.session_state.extracted_years} Yrs")
+            st.write(f"**Education:** {st.session_state.extracted_edu}")
+        with col3:
+            st.metric("Company", st.session_state.extracted_company[:15] + "..." if len(st.session_state.extracted_company) > 15 else st.session_state.extracted_company)
+            if "extracted_skills" in st.session_state:
+                st.write(f"**Skills:** {', '.join(st.session_state.extracted_skills[:2])}")
 
 jd_text = st.text_area("Paste Job Description (JD)", height=300, placeholder="Paste the full job description here...")
 

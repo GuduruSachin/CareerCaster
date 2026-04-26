@@ -436,6 +436,7 @@ class GreenRoom(QMainWindow):
         if 'active_model' not in self.session_data: self.session_data['active_model'] = {}
         self.session_data['active_model']['name'] = name
         LOGGER.info(f"Command Center: AI Model switched to {name}")
+        self.validate_all()
 
     def populate_devices(self):
         self.itv_combo.clear()
@@ -477,13 +478,16 @@ class GreenRoom(QMainWindow):
     def validate_all(self):
         if not hasattr(self, 'root_layout'): return
         if not hasattr(self, 'start_btn') or self.start_btn is None: return
-        if not hasattr(self, 'api_latency'): return
         
         has_itv = hasattr(self, 'itv_combo') and self.itv_combo.currentData() != -1
         has_mic = hasattr(self, 'mic_combo') and self.mic_combo.currentData() != -1
-        # v1.8.9: Permissive AI check - if we have models, we are ready
-        has_ai = len(self.available_models) > 0
-        has_context = len(str(self.session_data.get("resume_text", ""))) > 50
+        # v1.8.10: Decoupled AI check - if models are found or selected, it's green
+        has_ai = self.model_selector.count() > 0 or self.model_selector.currentText() != ""
+        
+        # Robust Context Check: Support both legacy and new keys
+        ctx_text = self.session_data.get("resume_text") or self.session_data.get("resume_data") or ""
+        has_context = len(str(ctx_text)) > 20 # Loosened for short resumes
+        
         self.start_btn.setEnabled(has_itv and has_mic and has_ai and has_context)
 
     def finalize_and_start(self):
