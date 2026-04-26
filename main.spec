@@ -7,7 +7,7 @@ block_cipher = None
 a = Analysis(
     ['desktop_agent/main.py'],
     pathex=[os.path.join(os.getcwd(), 'desktop_agent', 'pkg_mocks')],
-    binaries=collect_dynamic_libs('pyaudio'),
+    binaries=collect_dynamic_libs('pyaudiowpatch'),
     datas=[
         ('desktop_agent/agent_core/', 'agent_core/'),
         ('core/', 'core/'),
@@ -19,7 +19,9 @@ a = Analysis(
         'torch',
         'torchaudio',
         'faster_whisper',
-        'pyaudio',
+        'pyaudiowpatch',
+        'chardet',
+        'charset_normalizer',
         'numpy',
         'PyQt6',
         'PyQt6.sip',
