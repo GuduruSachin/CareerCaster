@@ -89,9 +89,6 @@ class GreenRoom(QMainWindow):
             LOGGER.error(f"Hardware initialization failed: {e}")
             self.devices = {"loopback": [], "mics": []}
         
-        # Initial context refresh (Safe: atoms are anchored)
-        self.refresh_context()
-
         # Init hardware meters
         self.meter_timer = QTimer()
         self.meter_timer.timeout.connect(self.update_meters)
@@ -109,6 +106,7 @@ class GreenRoom(QMainWindow):
         self.mic_combo.currentIndexChanged.connect(self.on_device_selection_changed)
         self.model_selector.currentTextChanged.connect(self.on_model_changed)
         self.on_device_selection_changed()
+        self.validate_all()
 
     def setup_stylesheet(self):
         """Bento-Style Professional Theme - High Reliability & Solid Palette."""
@@ -268,35 +266,6 @@ class GreenRoom(QMainWindow):
         audio_lay.addLayout(v_in)
         
         self.root_layout.addWidget(audio_card)
-
-        # --- 3. SESSION CONTEXT SECTION ---
-        session_card = QFrame()
-        session_card.setObjectName("ControlCard")
-        session_lay = QVBoxLayout(session_card)
-        session_lay.setContentsMargins(25, 25, 25, 25)
-        session_lay.setSpacing(18)
-
-        h_session = QLabel("Session Intel")
-        h_session.setObjectName("SectionHeader")
-        h_session.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
-        session_lay.addWidget(h_session)
-
-        self.candidate_label = QLabel("Candidate: ...")
-        self.candidate_label.setObjectName("DataValue")
-        self.candidate_label.setWordWrap(True)
-        
-        self.role_label = QLabel("Position: ...")
-        self.role_label.setObjectName("DataValue")
-        self.role_label.setWordWrap(True)
-        
-        session_lay.addWidget(self.candidate_label)
-        session_lay.addWidget(self.role_label)
-        
-        self.context_status = QLabel("● READINESS DATA SYNCED")
-        self.context_status.setStyleSheet("color: #10B981; font-weight: 800; font-size: 10px; margin-top: 5px; letter-spacing: 0.5px;")
-        session_lay.addWidget(self.context_status)
-        
-        self.root_layout.addWidget(session_card)
 
         # --- 4. AI CONFIGURATION SECTION ---
         ai_card = QFrame()
@@ -500,28 +469,3 @@ class GreenRoom(QMainWindow):
         self.meter_timer.stop()
         self.session_data['disable_stealth'] = not self.stealth_toggle.isChecked()
         self.ready_to_start.emit(self.session_data)
-
-    def refresh_context(self):
-        if not hasattr(self, 'root_layout'): return
-        if not hasattr(self, 'session_data'): return
-        
-        # v1.8.7: Map incoming keys robustly
-        name = self.session_data.get("candidate_name") or self.session_data.get("user_name") or "Candidate"
-        role = self.session_data.get("target_role") or self.session_data.get("target_position") or "Target Position"
-        
-        # Handle "Unknown" from previous failed handshakes
-        if name == "Unknown": name = "Candidate"
-        if "Inferred" in role: role = "Ready for Session"
-        
-        # Clean title
-        clean_name = name.strip().title()
-        clean_role = role.strip()
-        
-        self.setWindowTitle(f"CAREERCASTER | {clean_name}")
-        
-        if hasattr(self, 'candidate_label'):
-            self.candidate_label.setText(f"Candidate: <b>{clean_name}</b>")
-        if hasattr(self, 'role_label'):
-            self.role_label.setText(f"Position: <b>{clean_role}</b>")
-            
-        self.validate_all()
