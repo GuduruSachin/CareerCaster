@@ -64,9 +64,9 @@ class AudioCaptureEngine:
         self.is_running = True
         
         # 1. Interviewer Source (Loopback/Speakers)
-        itv_target = interviewer_idx if interviewer_idx is not None else self.find_wasapi_loopback()
+        itv_target = interviewer_idx if (interviewer_idx is not None and interviewer_idx != -1) else self.find_wasapi_loopback()
         
-        if itv_target is not None:
+        if itv_target is not None and itv_target != -1:
             try:
                 itv_info = self.pa.get_device_info_by_index(itv_target)
                 self.itv_rate = int(itv_info.get('defaultSampleRate', 44100))
@@ -85,7 +85,7 @@ class AudioCaptureEngine:
                 self._handle_stream_error("Interviewer", e)
 
         # 2. User Source (Microphone)
-        mic_target = user_idx # If None, PyAudio uses system default
+        mic_target = user_idx if user_idx != -1 else None # If None, PyAudio uses system default
         
         try:
             if mic_target is None:
@@ -162,6 +162,8 @@ class AudioCaptureEngine:
     def stop_capture(self):
         self.is_running = False
         for s in self.streams:
-            s.stop_stream()
-            s.close()
-        self.pa.terminate()
+            try:
+                s.stop_stream()
+                s.close()
+            except: pass
+        self.streams = []

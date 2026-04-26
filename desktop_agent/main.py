@@ -167,9 +167,8 @@ def initialize_refined_skeleton():
     DIAGNOSTIC_TIMER.timeout.connect(run_heartbeat)
     DIAGNOSTIC_TIMER.start(5000)
 
-    # FINAL STEP: Paint and Refresh Context
+    # FINAL STEP: Paint interface
     GREEN_ROOM.show()
-    GREEN_ROOM.refresh_context()
     
     exit_code = APPLICATION_INSTANCE.exec()
     LOGGER.info("Interface shutdown sequence complete.")

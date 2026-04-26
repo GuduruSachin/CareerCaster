@@ -140,6 +140,13 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
             # --- v1.7.1 RESOLVE [WinError 87] & HARDEN LAUNCH SEQUENCE ---
             abs_session_path = os.path.normpath(os.path.abspath(file_path))
             
+            # --- USER RECOVERY COMMAND ---
+            st.info("💡 **Manual Recovery Command**\nIf the desktop app fails to open, copy and run this in your terminal:")
+            project_base = "C:\\Users\\hp\\source\\repos\\CareerCaster"
+            exe_cmd_path = f"{project_base}\\dist\\CareerCaster\\CareerCaster.exe"
+            session_cmd_path = f"{project_base}\\sessions\\{session_id}.cc"
+            st.code(f'"{exe_cmd_path}" "{session_cmd_path}"', language="bash")
+
             if not os.path.exists(abs_session_path):
                 st.error("FATAL: Session file failed to write to disk.")
                 st.stop()

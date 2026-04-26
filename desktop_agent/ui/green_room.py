@@ -98,8 +98,9 @@ class GreenRoom(QMainWindow):
         self.populate_devices()
         self.load_saved_settings()
         
-        # Background Discovery
+        # Background Discovery & Pre-loading
         threading.Thread(target=self.discover_ai_models, daemon=True).start()
+        threading.Thread(target=self.prewarm_stt, daemon=True).start()
         
         # Event Handlers
         self.itv_combo.currentIndexChanged.connect(self.on_device_selection_changed)
@@ -267,6 +268,36 @@ class GreenRoom(QMainWindow):
         
         self.root_layout.addWidget(audio_card)
 
+        # --- 3. SESSION INTEL SECTION ---
+        intel_card = QFrame()
+        intel_card.setObjectName("ControlCard")
+        intel_lay = QVBoxLayout(intel_card)
+        intel_lay.setContentsMargins(25, 25, 25, 25)
+        intel_lay.setSpacing(15)
+
+        h_intel = QLabel("Target Intel")
+        h_intel.setObjectName("SectionHeader")
+        h_intel.setStyleSheet("color: #00E5FF; font-size: 14px; font-weight: 700; text-transform: none; margin-bottom: 5px;")
+        intel_lay.addWidget(h_intel)
+
+        name = self.session_data.get("candidate_name", "Candidate")
+        role = self.session_data.get("target_role", "Target Position")
+        
+        gl = QGridLayout()
+        gl.setSpacing(10)
+        
+        l1 = QLabel("CANDIDATE"); l1.setStyleSheet("color: #4B5563; font-size: 9px; font-weight: 800; letter-spacing: 1px;")
+        v1 = QLabel(name.upper()); v1.setStyleSheet("color: #FFFFFF; font-size: 16px; font-weight: 800;")
+        
+        l2 = QLabel("POSITION"); l2.setStyleSheet("color: #4B5563; font-size: 9px; font-weight: 800; letter-spacing: 1px;")
+        v2 = QLabel(role.upper()); v2.setStyleSheet("color: #FFFFFF; font-size: 14px; font-weight: 600;")
+        
+        gl.addWidget(l1, 0, 0); gl.addWidget(v1, 1, 0)
+        gl.addWidget(l2, 0, 1); gl.addWidget(v2, 1, 1)
+        
+        intel_lay.addLayout(gl)
+        self.root_layout.addWidget(intel_card)
+
         # --- 4. AI CONFIGURATION SECTION ---
         ai_card = QFrame()
         ai_card.setObjectName("ControlCard")
@@ -307,8 +338,9 @@ class GreenRoom(QMainWindow):
         # --- 5. INITIALIZE ACTION ---
         self.root_layout.addStretch(1)
         
-        self.start_btn = QPushButton("FINALIZE & START COPILOT")
+        self.start_btn = QPushButton("LAUNCH INTERVIEW ASSISTANT")
         self.start_btn.setObjectName("ActionBtn")
+        self.start_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.start_btn.setEnabled(False)
         self.start_btn.setMinimumHeight(65)
         self.start_btn.clicked.connect(self.finalize_and_start)
@@ -460,12 +492,40 @@ class GreenRoom(QMainWindow):
         self.start_btn.setEnabled(has_itv and has_mic and has_ai and has_context)
 
     def finalize_and_start(self):
+        # Ensure we don't start until STT is ready
+        self.start_btn.setText("INITIALIZING CORE...")
+        self.start_btn.setEnabled(False)
+        
+        def check_and_launch():
+            from agent_core.stt_service import STTService
+            stt = STTService() # Singleton access
+            if stt.initialized:
+                QTimer.singleShot(0, self.do_launch)
+            else:
+                QTimer.singleShot(500, check_and_launch)
+        
+        check_and_launch()
+
+    def do_launch(self):
+        hw_config = {
+            "interviewer_device_id": self.itv_combo.currentData(),
+            "mic_device_id": self.mic_combo.currentData()
+        }
         with open(get_settings_path(), "w") as f:
-            json.dump({
-                "interviewer_device_id": self.itv_combo.currentData(),
-                "mic_device_id": self.mic_combo.currentData()
-            }, f)
+            json.dump(hw_config, f)
+            
         self.audio_engine.stop_capture()
         self.meter_timer.stop()
         self.session_data['disable_stealth'] = not self.stealth_toggle.isChecked()
-        self.ready_to_start.emit(self.session_data)
+        
+        # v1.8.12: Emit hardware config specifically as the first argument
+        self.ready_to_start.emit(hw_config)
+
+    def prewarm_stt(self):
+        """Pre-loads the heavy STT/Whisper models in the background."""
+        try:
+            from agent_core.stt_service import STTService
+            STTService() # Triggers singleton init
+            LOGGER.info("STT Engine Pre-warmed successfully.")
+        except Exception as e:
+            LOGGER.error(f"STT Pre-warm failed: {e}")

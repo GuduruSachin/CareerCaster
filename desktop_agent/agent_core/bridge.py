@@ -40,6 +40,7 @@ class CareerBridge(QObject):
         self.status_changed.emit("Listening")
 
     def _processing_loop(self):
+        print(f"[*] Audio Pipeline Active. Interviewer IDX: {self.interviewer_idx}")
         while self.is_active:
             # 1. Process Interviewer (Trigger Source)
             while not self.audio.interviewer_queue.empty():
