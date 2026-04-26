@@ -351,73 +351,67 @@ class GreenRoom(QMainWindow):
         self.root_layout.addWidget(foot)
 
     def discover_ai_models(self):
-        """V1.8.2: Dynamic Discovery & Intelligent Latency Sort."""
+        """v1.8.6: Hardened AI Discovery - Fast-Start with background verification."""
         if not self.api_key:
             QTimer.singleShot(0, lambda: self.on_ai_fail("API Key Missing"))
             return
-            
-        start_time = time.time()
-        success_list = []
-        latency_map = {}
-        
-        try:
-            client = genai.Client(api_key=self.api_key)
-            
-            # 1. Dynamic Discovery via API
-            # Fetching models with generateContent support
-            remote_models = client.models.list()
-            discovery_pool = []
-            for m in remote_models:
-                if "generateContent" in m.supported_methods:
-                    name = m.name.split("/")[-1]
-                    discovery_pool.append(name)
-            
-            # 2. Priority Testing (Parallel for speed)
-            # We pick the 4 most likely candidates for latency testing
-            priority_targets = ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-            tested_count = 0
-            
-            def test_latency(model_id):
-                nonlocal tested_count
-                try:
-                    ts = time.time()
-                    client.models.generate_content(model=model_id, contents="ping")
-                    lat = int((time.time() - ts) * 1000)
-                    latency_map[model_id] = lat
-                except:
-                    pass
-                tested_count += 1
 
-            threads = []
-            for target in discovery_pool:
-                # We only test a subset to avoid excessive startup lag
-                if target in priority_targets:
-                    t = threading.Thread(target=test_latency, args=(target,))
+        def run_discovery():
+            try:
+                client = genai.Client(api_key=self.api_key)
+                
+                # 1. IMMEDIATE POPULATION: Fast-start with common models
+                # This ensures the dropdown is never empty
+                targets = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+                self.available_models = targets
+                QTimer.singleShot(0, self.on_ai_success)
+                
+                # 2. BACKGROUND VERIFICATION: Silently check which ones are actually responsive
+                verified_list = []
+                latency_map = {}
+                
+                def ping_model(m_id):
+                    try:
+                        t0 = time.time()
+                        client.models.generate_content(model=m_id, contents="ping")
+                        lat = int((time.time() - t0) * 1000)
+                        latency_map[m_id] = lat
+                        verified_list.append(m_id)
+                    except:
+                        pass
+                
+                threads = []
+                for m in targets:
+                    t = threading.Thread(target=ping_model, args=(m,))
+                    t.daemon = True
                     t.start()
                     threads.append(t)
-            
-            for t in threads: t.join(timeout=2.0)
-            
-            # 3. Compile Final List
-            # Sort by: (Is Tested?) -> (Latency ASC) -> (Alpha)
-            discovered_models = sorted(discovery_pool, key=lambda x: (
-                0 if x in latency_map else 1,
-                latency_map.get(x, 9999),
-                x
-            ))
-            
-            if discovered_models:
-                self.available_models = discovered_models
-                # Best performing or first in list
-                best_lat = min(latency_map.values()) if latency_map else -1
-                self.api_latency = best_lat
-                QTimer.singleShot(0, self.on_ai_success)
-            else:
-                QTimer.singleShot(0, lambda: self.on_ai_fail("No compatible models found"))
                 
-        except Exception as e:
-            LOGGER.error(f"Discovery Error: {e}")
-            QTimer.singleShot(0, lambda: self.on_ai_fail(str(e)))
+                # Wait for verification (max 2s)
+                for t in threads: t.join(timeout=2.0)
+                
+                if verified_list:
+                    # Final sort based on real-world latency
+                    final_list = sorted(verified_list, key=lambda x: latency_map.get(x, 9999))
+                    self.available_models = final_list
+                    self.api_latency = min(latency_map.values()) if latency_map else 0
+                    QTimer.singleShot(0, self.on_ai_success)
+                
+                # 3. Dynamic Expansion (Deep Background)
+                try:
+                    remote = client.models.list()
+                    for rm in remote:
+                        m_name = rm.name.split("/")[-1]
+                        if m_name not in self.available_models and "generateContent" in rm.supported_methods:
+                            self.available_models.append(m_name)
+                    QTimer.singleShot(0, self.on_ai_success)
+                except: pass
+
+            except Exception as e:
+                LOGGER.error(f"AI Discovery Failure: {e}")
+                # We already showed the fallback list, so we don't call on_ai_fail unless critical
+        
+        threading.Thread(target=run_discovery, daemon=True).start()
 
     def on_ai_success(self):
         self.model_selector.clear()

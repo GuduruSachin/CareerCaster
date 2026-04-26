@@ -80,14 +80,7 @@ with st.sidebar:
     st.info("The Web Hub is now for Data Input only. AI Settings have moved to the Green Room co-pilot.")
 
 # --- Main UI Components ---
-st.subheader("📄 Step 1: Profile Details")
-col1, col2 = st.columns(2)
-with col1:
-    candidate_name = st.text_input("Name on Resume", value=st.session_state.extracted_name, placeholder="e.g. Pravalika")
-with col2:
-    target_role = st.text_input("Target Position", value=st.session_state.extracted_role, placeholder="e.g. Software Engineer")
-
-st.subheader("📄 Step 2: Upload Data")
+st.subheader("📄 Step 1: Upload Data")
 
 resume_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 
@@ -97,26 +90,33 @@ if resume_file:
         resume_file = None
     else:
         # Extract text once
-        if not st.session_state.resume_text:
+        if not st.session_state.resume_text or st.session_state.get("last_uploaded") != resume_file.name:
             try:
+                # Important: Fix the PdfReader import as it might be 'pypdf' now
+                try:
+                    from pypdf import PdfReader
+                except ImportError:
+                    from PyPDF2 import PdfReader
+                    
                 reader = PdfReader(resume_file)
                 text = "".join([page.extract_text() or "" for page in reader.pages])
                 st.session_state.resume_text = text.strip()
+                st.session_state.last_uploaded = resume_file.name
                 
-                # --- v1.8.1: AI EXTRACTION ---
+                # --- v1.8.6: AI EXTRACTION ---
                 if api_key and api_key != "YOUR_ENTERPRISE_API_KEY_HERE":
                     try:
                         from google import genai
                         client = genai.Client(api_key=api_key)
-                        prompt = f"Extract the full name and the target job title from this resume. Output ONLY valid JSON like: {{\"name\": \"John Doe\", \"role\": \"Software Engineer\"}}. Resume:\n{st.session_state.resume_text[:2000]}"
-                        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+                        prompt = f"Extract the candidate's Full Name and the Target Position from this resume. Output ONLY valid JSON: {{\"name\": \"...\", \"role\": \"...\"}}. Resume:\n{st.session_state.resume_text[:3000]}"
+                        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
                         if response.text:
-                            # Clean up potential markdown formatting
-                            clean_json = response.text.strip().replace("```json", "").replace("```", "").strip()
+                            clean_json = response.text.replace("```json", "").replace("```", "").strip()
                             data = json.loads(clean_json)
-                            st.session_state.extracted_name = data.get("name", "")
-                            st.session_state.extracted_role = data.get("role", "")
-                            st.info(f"✨ AI Extracted: {st.session_state.extracted_name} | {st.session_state.extracted_role}")
+                            st.session_state.extracted_name = data.get("name", "").strip()
+                            st.session_state.extracted_role = data.get("role", "").strip()
+                            if st.session_state.extracted_name:
+                                st.success(f"✨ Detected Profile: {st.session_state.extracted_name}")
                     except Exception as ai_e:
                         print(f"Extraction failed: {ai_e}")
             except Exception as e:
@@ -139,8 +139,8 @@ if st.button("🚀 Launch Interview Copilot", disabled=not can_prepare, type="pr
                 "api_key": api_key,
                 "resume_text": st.session_state.resume_text,
                 "jd_text": jd_text,
-                "candidate_name": candidate_name or "Unknown",
-                "target_role": target_role or "Inferred from JD",
+                "candidate_name": st.session_state.extracted_name or "Unknown",
+                "target_role": st.session_state.extracted_role or "Inferred from JD",
                 "session_id": session_id,
             }
             

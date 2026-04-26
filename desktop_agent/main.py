@@ -139,8 +139,8 @@ def initialize_refined_skeleton():
                     decrypted_data['project'] = decrypted_data.get('project_notes', decrypted_data.get('project', ''))
                     
                     # HARDENED IDENTITY MAPPING
-                    decrypted_data['candidate_name'] = decrypted_data.get('candidate_name', decrypted_data.get('user_name', 'EXTRACTING...'))
-                    decrypted_data['target_role'] = decrypted_data.get('target_role', decrypted_data.get('target_position', 'PREPARING...'))
+                    decrypted_data['candidate_name'] = decrypted_data.get('candidate_name') or decrypted_data.get('user_name') or "Candidate"
+                    decrypted_data['target_role'] = decrypted_data.get('target_role') or decrypted_data.get('target_position') or "Target Position"
 
                     sess_id = decrypted_data.get('session_id', 'Unknown')
                     LOGGER.info(f"Session Sync Success: {sess_id}")

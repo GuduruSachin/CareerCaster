@@ -17,7 +17,7 @@ def download_silero_vad():
         
     print(f"[*] Target Directory: {models_dir}")
     
-    # 2. Silero VAD JIT URL (Corrected Source Path)
+    # 2. Silero VAD JIT URL (Source Path Restoration)
     url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit"
     
     if os.path.exists(target_path):
