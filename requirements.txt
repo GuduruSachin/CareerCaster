@@ -5,10 +5,12 @@
 streamlit==1.56.0
 pypdf==5.1.0
 google-genai==0.3.0
-pandas==3.0.2
+pandas==2.2.3
 PyQt6==6.11.0
 cryptography==42.0.5
 requests==2.33.1
+chardet==7.4.3
+charset-normalizer==3.4.7
 
 # --- AUDIO & STEALTH ENGINE ---
 pyaudiowpatch>=0.2.12

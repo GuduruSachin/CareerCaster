@@ -5,7 +5,8 @@ import logging
 import threading
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QComboBox, QPushButton, QProgressBar, 
-                             QFrame, QScrollArea, QSizePolicy, QCheckBox, QGridLayout, QMessageBox)
+                             QFrame, QScrollArea, QSizePolicy, QCheckBox, QGridLayout, 
+                             QMessageBox, QDialog)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 
@@ -22,6 +23,80 @@ from agent_core.audio_capture import AudioCaptureEngine
 
 LOGGER = logging.getLogger("CareerCaster")
 
+class ConsentDialog(QDialog):
+    """Custom, branded consent dialog for hardware access."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Hardware Permissions")
+        self.setFixedWidth(400)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        # UI Container
+        self.container = QFrame(self)
+        self.container.setStyleSheet("""
+            QFrame {
+                background-color: #121212;
+                border: 1px solid #2A2A2A;
+                border-radius: 12px;
+            }
+            QLabel { color: #A0AAB7; font-family: 'Segoe UI'; font-size: 14px; background: transparent; border: none; }
+            QLabel#Title { color: #FFFFFF; font-size: 18px; font-weight: 800; selection-background-color: transparent; }
+            QPushButton#Allow {
+                background: #00E5FF;
+                color: black;
+                font-weight: 800;
+                border-radius: 6px;
+                padding: 10px;
+                min-width: 100px;
+            }
+            QPushButton#Decline {
+                background: transparent;
+                color: #6B7280;
+                border: 1px solid #1E1E1E;
+                border-radius: 6px;
+                padding: 10px;
+                min-width: 100px;
+            }
+            QPushButton#Decline:hover {
+                color: #FFFFFF;
+                border: 1px solid #2A2A2A;
+            }
+        """)
+        
+        layout = QVBoxLayout(self.container)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(15)
+        
+        title = QLabel("Hardware Access Required")
+        title.setObjectName("Title")
+        layout.addWidget(title)
+        
+        desc = QLabel("CareerCaster needs access to your <b>Microphone</b> (to listen to you) and <b>System Speakers</b> (to listen to the interviewer).<br><br>Allow this hardware access?")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        
+        btn_lay = QHBoxLayout()
+        btn_lay.setSpacing(10)
+        btn_lay.addStretch()
+        
+        self.no_btn = QPushButton("Decline")
+        self.no_btn.setObjectName("Decline")
+        self.no_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.no_btn.clicked.connect(self.reject)
+        
+        self.yes_btn = QPushButton("Allow Access")
+        self.yes_btn.setObjectName("Allow")
+        self.yes_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.yes_btn.clicked.connect(self.accept)
+        
+        btn_lay.addWidget(self.no_btn)
+        btn_lay.addWidget(self.yes_btn)
+        layout.addLayout(btn_lay)
+        
+        main_lay = QVBoxLayout(self)
+        main_lay.addWidget(self.container)
+
 class GreenRoom(QMainWindow):
     """
     CareerCaster v1.7 - Intelligent Command Center.
@@ -33,9 +108,9 @@ class GreenRoom(QMainWindow):
         super().__init__()
         self.session_data = session_data or {}
         self.setWindowTitle("CareerCaster Pro")
-        self.setFixedWidth(500)
+        self.setMinimumWidth(450)
         self.setMinimumHeight(600)
-        self.setMaximumHeight(900)
+        self.resize(550, 800)
         
         # 1. UI ROOT CONSTRUCTION
         self.root_widget = QWidget()
@@ -79,13 +154,8 @@ class GreenRoom(QMainWindow):
             self.api_key = None
             
         # Consent Check
-        reply = QMessageBox.question(
-            self, 'Hardware Access Consent',
-            'CareerCaster needs to access your Microphone and System Loopback (Speakers) for the interview analysis. Allow?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        has_consent = (reply == QMessageBox.StandardButton.Yes)
+        dialog = ConsentDialog(self)
+        has_consent = (dialog.exec() == QDialog.DialogCode.Accepted)
 
         # Hardware Setup
         if has_consent:
@@ -250,10 +320,10 @@ class GreenRoom(QMainWindow):
         # --- 2. AUDIO HARDWARE SECTION ---
         self.audio_card = QFrame()
         self.audio_card.setObjectName("ControlCard")
-        self.audio_card.setMinimumHeight(350)
+        # Removed hardcoded height to allow symmetric display of mic + loopback
         audio_lay = QVBoxLayout(self.audio_card)
         audio_lay.setContentsMargins(30, 30, 30, 30)
-        audio_lay.setSpacing(15)
+        audio_lay.setSpacing(25) # Increased spacing for better separation
 
         h_audio = QLabel("AUDIO HARDWARE SETUP")
         h_audio.setObjectName("SectionHeader")
@@ -263,7 +333,7 @@ class GreenRoom(QMainWindow):
         itv_box = QVBoxLayout()
         itv_box.setSpacing(10)
         
-        lbl_out = QLabel("INTERVIEWER SOURCE (LOOPBACK)")
+        lbl_out = QLabel("INTERVIEWER SOURCE")
         lbl_out.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
         itv_box.addWidget(lbl_out)
         
