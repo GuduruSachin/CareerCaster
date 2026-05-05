@@ -464,16 +464,22 @@ class GreenRoom(QMainWindow):
                 try:
                     remote = client.models.list()
                     for rm in remote:
-                        if "generateContent" in rm.supported_methods:
-                            m_full = rm.name
-                            m_short = m_full.split("/")[-1]
-                            # Filter for usable chat models
-                            if "vision" not in m_short and "embedding" not in m_short and "text" not in m_short:
-                                candidates.append((m_short, m_full))
-                except:
-                    # Fallback list if API call fails
-                    candidates = [("gemini-1.5-flash", "models/gemini-1.5-flash"), 
-                                 ("gemini-2.0-flash", "models/gemini-2.0-flash")]
+                        m_full = rm.name
+                        m_short = m_full.split("/")[-1]
+                        
+                        # Accommodate both old and new SDK attribute names
+                        methods = getattr(rm, "supported_generation_methods", [])
+                        if not methods:
+                            methods = getattr(rm, "supported_methods", [])
+                        
+                        is_generative = "generateContent" in methods if methods else True
+                        
+                        # Filter for usable chat models
+                        if is_generative and "gemini" in m_short.lower() and "vision" not in m_short.lower() and "embedding" not in m_short.lower():
+                            candidates.append((m_short, m_full))
+                except Exception as e:
+                    LOGGER.error(f"Failed to fetch models: {e}")
+                    raise e # Let the outer try-except handle the failure and show "System Error" or "Empty Discovery"
 
                 # 2. Parallel Latency Verification
                 verified_results = [] # list of {"short":, "full":, "lat":}
