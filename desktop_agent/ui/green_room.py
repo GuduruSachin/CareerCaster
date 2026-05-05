@@ -222,6 +222,14 @@ class GreenRoom(QMainWindow):
                 font-size: 11px;
                 letter-spacing: 1.5px;
                 margin-bottom: 5px;
+                background: transparent;
+            }
+            QLabel#SectionSubHeader {
+                color: #8F9BA8;
+                font-weight: 800;
+                font-size: 10px;
+                letter-spacing: 1.2px;
+                background: transparent;
             }
             
             /* Data Values */
@@ -320,10 +328,10 @@ class GreenRoom(QMainWindow):
         # --- 2. AUDIO HARDWARE SECTION ---
         self.audio_card = QFrame()
         self.audio_card.setObjectName("ControlCard")
-        # Removed hardcoded height to allow symmetric display of mic + loopback
+        self.audio_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         audio_lay = QVBoxLayout(self.audio_card)
-        audio_lay.setContentsMargins(30, 30, 30, 30)
-        audio_lay.setSpacing(25) # Increased spacing for better separation
+        audio_lay.setContentsMargins(30, 25, 30, 25)
+        audio_lay.setSpacing(20)
 
         h_audio = QLabel("AUDIO HARDWARE SETUP")
         h_audio.setObjectName("SectionHeader")
@@ -331,37 +339,39 @@ class GreenRoom(QMainWindow):
 
         # Output Monitor (Loopback)
         itv_box = QVBoxLayout()
-        itv_box.setSpacing(10)
+        itv_box.setSpacing(8)
         
         lbl_out = QLabel("INTERVIEWER SOURCE")
-        lbl_out.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        lbl_out.setObjectName("SectionSubHeader")
         itv_box.addWidget(lbl_out)
         
         self.itv_combo = QComboBox()
-        self.itv_combo.setMinimumHeight(48)
+        self.itv_combo.setMinimumHeight(45)
         itv_box.addWidget(self.itv_combo)
         
         self.itv_meter = QProgressBar()
         self.itv_meter.setMinimumHeight(6)
+        self.itv_meter.setMaximumHeight(6)
         itv_box.addWidget(self.itv_meter)
         
         audio_lay.addLayout(itv_box)
-        audio_lay.addSpacing(15)
+        audio_lay.addSpacing(10)
 
         # Input Monitor (Microphone)
         mic_box = QVBoxLayout()
-        mic_box.setSpacing(10)
+        mic_box.setSpacing(8)
         
         lbl_in = QLabel("YOUR MICROPHONE")
-        lbl_in.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        lbl_in.setObjectName("SectionSubHeader")
         mic_box.addWidget(lbl_in)
         
         self.mic_combo = QComboBox()
-        self.mic_combo.setMinimumHeight(48)
+        self.mic_combo.setMinimumHeight(45)
         mic_box.addWidget(self.mic_combo)
         
         self.mic_meter = QProgressBar()
         self.mic_meter.setMinimumHeight(6)
+        self.mic_meter.setMaximumHeight(6)
         mic_box.addWidget(self.mic_meter)
         
         audio_lay.addLayout(mic_box)
@@ -371,9 +381,9 @@ class GreenRoom(QMainWindow):
         # --- 3. AI CONFIGURATION SECTION ---
         ai_card = QFrame()
         ai_card.setObjectName("ControlCard")
-        ai_card.setMinimumHeight(220)
+        ai_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         ai_lay = QVBoxLayout(ai_card)
-        ai_lay.setContentsMargins(30, 30, 30, 30)
+        ai_lay.setContentsMargins(30, 25, 30, 25)
         ai_lay.setSpacing(20)
 
         h_ai = QLabel("AI INTELLIGENCE CONFIG")
@@ -386,11 +396,11 @@ class GreenRoom(QMainWindow):
         v_model = QVBoxLayout()
         v_model.setSpacing(8)
         lbl_model = QLabel("REASONING ENGINE")
-        lbl_model.setStyleSheet("color: #6B7280; font-weight: 800; font-size: 9px; letter-spacing: 1.2px;")
+        lbl_model.setObjectName("SectionSubHeader")
         v_model.addWidget(lbl_model)
         
         self.model_selector = QComboBox()
-        self.model_selector.setMinimumHeight(48)
+        self.model_selector.setMinimumHeight(45)
         v_model.addWidget(self.model_selector)
         ai_row.addLayout(v_model, 3)
         
@@ -440,7 +450,13 @@ class GreenRoom(QMainWindow):
             return
 
         def run_discovery():
+            import os
             try:
+                env_key = os.environ.get("GEMINI_API_KEY", "")
+                masked = env_key[:8] + "..." if len(env_key) > 8 else "NOT_SET_OR_EMPTY"
+                LOGGER.info(f"[ENV DIAGNOSTICS] Evaluated GEMINI_API_KEY from environment: {masked}")
+                LOGGER.info(f"[API] Using Active API Key length: {len(self.api_key)}")
+
                 client = genai.Client(api_key=self.api_key)
                 
                 # 1. Fetch Candidates (Broad Sweep)
@@ -489,8 +505,8 @@ class GreenRoom(QMainWindow):
                 for t in threads: t.join(timeout=2.0)
                 
                 if verified_results:
-                    # Sort by latency ASC
-                    final_sorted = sorted(verified_results, key=lambda x: x["lat"])
+                    # Sort by latency DESC as per user request (high latency first)
+                    final_sorted = sorted(verified_results, key=lambda x: x["lat"], reverse=True)
                     self.available_models = final_sorted # Store dicts now
                     self.api_latency = final_sorted[0]["lat"]
                     QTimer.singleShot(0, self.on_ai_success)
@@ -519,7 +535,7 @@ class GreenRoom(QMainWindow):
         self.model_selector.setEnabled(True)
             
         self.status_led.setStyleSheet("background-color: #00FF7F; border-radius: 2px;")
-        self.status_msg.setText(f"FASTEST: {self.api_latency}ms")
+        self.status_msg.setText(f"ONLINE: {self.api_latency}ms")
         self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #00FF88; font-weight: bold; font-size: 11px;")
         
         # Save choice to session immediately (using the FULL name in itemData)

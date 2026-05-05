@@ -1,5 +1,11 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 def get_master_api_key():
     """
     Retrieves the global API key for CareerCaster.
