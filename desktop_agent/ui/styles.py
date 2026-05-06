@@ -57,9 +57,9 @@ def get_bubble_style(border_color):
 CONTENT_LABEL_STYLE = """
     QLabel {
         color: #E0E0E0; 
-        font-size: 13px; 
-        font-family: 'Segoe UI'; 
-        line-height: 150%; 
+        font-size: 15px; 
+        font-family: 'Segoe UI', sans-serif; 
+        line-height: 160%; 
         background: transparent; 
         border: none;
     }

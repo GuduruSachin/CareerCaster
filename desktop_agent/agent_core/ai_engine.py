@@ -100,30 +100,18 @@ class AIWorker(QThread):
                 bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet/Notes]...'"
 
             system_instruction = f"""
-            Identity: You ARE the candidate. Speak ONLY in the first person ('I', 'Me', 'My').
+            Identify as the candidate. Speak ONLY in the first person ('I', 'Me', 'My').
             {bridge_instr}
             {specific_guardrail}
 
             Contextual Assets:
             [PROJECT NOTES]: {self.project_notes}
 
-            1. Situational Response Weighting:
-               - Level 1 (Intro/Short): For greetings/small talk, provide a 1-paragraph friendly spoken response.
-               - Level 2 (Technical/Explanatory): For 'How-to' or 'What is', provide ~2 paragraphs focusing on Trade-offs and logic.
-               - Level 3 (Strategic/STAR): For 'Tell me about...' or 'Walk me through...', provide ~3 detailed paragraphs using STAR method anchored in [CV SNIPPET] projects (e.g., Enterprise Dashboard, CLR System).
-
-            2. Speech-Centered Vocabulary (Workshop English):
-               - Replace academic terms: 'makes it easy' (NOT 'facilitates'), 'fast' (NOT 'optimal').
-               - Forced Contractions: Use 'I've', 'Don't', 'We're', 'It's', 'I'm' to ensure natural rhythm.
-               - Forbidden Words: Essentially, Furthermore, Moreover, Delineate, Comprehensive, Subject to.
-
-            3. Technical Bug Patches & Latency:
-               - Encoding: Use ASCII-only characters. NO smart-quotes or special symbols. Use standard ' and ".
-               - Latency: SKIP all fillers like 'That's a great question'. Start the answer IMMEDIATELY.
-
-            4. Visual Scannability:
-               - Bold Strategy: BOLD ONLY technical nouns (e.g., **stored procedures**, **latency**, **SSO**) to act as cues.
-               - No Junk: Strictly FORBID code blocks, images, or bullet points.
+            Guidelines for a natural, conversational response:
+            1. Length: Keep the response concise. Aim for 1-2 short paragraphs that sound like natural spoken language. Do NOT provide overly long "Level 3" essays unless absolutely necessary.
+            2. Tone: Friendly, professional, and conversational. Use contractions (I've, We're, It's).
+            3. Formatting: Do NOT use markdown bolding, italics, or code blocks. The text will be read aloud or quickly scanned on an overlay, so keep it plain text.
+            4. Start Immediately: Skip filler phrases. Start your answer directly and naturally.
             """
 
             # Prompt Framing: Modular and snippet-focused
@@ -133,7 +121,7 @@ class AIWorker(QThread):
             
             INTERVIEWER QUESTION: {self.prompt}
             
-            Umesh, deliver your response:
+            Please deliver your response as the candidate:
             """
 
             # Audit: Log Refined Parameters
@@ -149,16 +137,47 @@ class AIWorker(QThread):
                 temperature=0.7 # Slight randomness for more human rhythm
             )
 
-            # 5. Stream Duration Monitoring
-            for chunk in client.models.generate_content_stream(
-                model=self.model_name,
-                contents=messages,
-                config=config
-            ):
-                if chunk.text:
-                    token = chunk.text
-                    full_response += token
-                    self.token_received.emit(token)
+            # Define exponential backoff for retries
+            max_retries = 3
+            base_delay = 1 # second
+            
+            # 5. Stream Duration Monitoring with Retries
+            # [API TESTING BYPASS] - Mocking response to save AI tokens while testing STT.
+            mock_message = f"**[STT TESTING MODE - AI DISABLED]**\nI heard:\n\"{self.prompt}\"\n\nTell me when you are ready to enable the AI again."
+            import time
+            for chunk in mock_message.split(" "):
+                token = chunk + " "
+                full_response += token
+                self.token_received.emit(token)
+                time.sleep(0.05)
+            
+            '''
+            for attempt in range(max_retries):
+                try:
+                    for chunk in client.models.generate_content_stream(
+                        model=self.model_name,
+                        contents=messages,
+                        config=config
+                    ):
+                        if chunk.text:
+                            token = chunk.text
+                            full_response += token
+                            self.token_received.emit(token)
+                    break # Success! Break out of the retry loop
+                except Exception as stream_err:
+                    import time # ensure time is imported if not already
+                    import logging
+                    error_msg = str(stream_err)
+                    # Check if it is a 503 or transient error
+                    if "503" in error_msg or "UNAVAILABLE" in error_msg or "temporarily" in error_msg.lower():
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)
+                            logging.getLogger("CareerCaster").warning(f"AI API 503. Retrying in {delay}s...")
+                            time.sleep(delay)
+                            continue
+                    # Default: reraise if we can't handle it or exhausted retries
+                    raise stream_err
+            '''
             
             # Audit: Final Metrics
             duration = time.time() - start_time

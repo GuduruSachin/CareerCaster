@@ -218,7 +218,9 @@ class StealthOverlay(QMainWindow):
             text = re.sub(pattern, replacement, text)
 
         # 2. MARKDOWN ACCENTS: Syntax highlighting for technical terms
-        processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; background-color: #000000; color: #00FFFF; padding: 2px;">\1</span>', text)
+        processed = re.sub(r'\*\*(.*?)\*\*', r'<b style="color: #FFFFFF;">\1</b>', text) # Parse bold
+        processed = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed)          # Parse single italics
+        processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; font-weight: bold; background-color: rgba(0, 255, 255, 0.1); color: #00E5FF; padding: 1px 4px; border-radius: 4px;">\1</span>', processed)
         return processed
 
     def update_bridge_status(self, status):
@@ -236,15 +238,17 @@ class StealthOverlay(QMainWindow):
 
     def trigger_ai_from_audio(self, text):
         """Callback for bridge detected interviewer text."""
+        LOGGER.info(f"[OVERLAY] Audio framing completed. Raw text detected: {text}")
         self.mock_input.setText(text)
-        self.start_ai_query()
+        self.start_ai_query(sender="INTERVIEWER")
 
-    def start_ai_query(self):
+    def start_ai_query(self, sender="USER"):
         query = self.mock_input.text().strip()
         if not query: return
         
         self.mock_input.clear()
-        self.inject_message(query, sender="USER")
+        LOGGER.info(f"[OVERLAY] Sending framed question to AI Engine: {query}")
+        self.inject_message(query, sender=sender)
         
         # Requirement 1: Only mock if Preview Mode is explicitly True
         if self.preview_mode_active:

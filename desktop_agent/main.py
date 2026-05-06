@@ -79,8 +79,8 @@ def setup_logging():
 def run_heartbeat():
     global HEARTBEAT_COUNT
     HEARTBEAT_COUNT += 1
-    if LOGGER:
-        LOGGER.info(f"Layer 4.Refactor: Heartbeat #{HEARTBEAT_COUNT} - Loop Valid at {time.strftime('%H:%M:%S')}")
+    # Disabled logging to stop spam
+    pass
 
 def start_stealth_overlay(hardware_config, updated_session_data):
     """Transition callback from Green Room to Stealth Overlay."""

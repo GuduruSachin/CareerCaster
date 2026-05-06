@@ -27,7 +27,7 @@ class CareerBridge(QObject):
         self.is_active = False
         
         self.silence_counter = 0
-        self.SILENCE_THRESHOLD_MS = 500
+        self.SILENCE_THRESHOLD_MS = 2500 # Wait for 2.5s pause to ensure question is complete
         self.CHUNK_DURATION_MS = 64 # based on 1024 chunk / 16000 hz
 
     def start(self):

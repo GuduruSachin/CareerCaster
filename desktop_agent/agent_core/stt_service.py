@@ -57,16 +57,9 @@ class STTService:
             else:
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 
-            model_path = os.path.join(base_dir, "models", "silero_vad.jit")
-            
-            if os.path.exists(model_path) and _VAD_MODEL is None:
-                LOGGER.info("[*] Core Loading: VAD Model...")
-                _VAD_MODEL = _TORCH.jit.load(model_path, map_location='cpu')
-                _VAD_MODEL.eval()
-                
             # Update the singleton instance properties
             self.model = _WHISPER_MODEL
-            self.vad_model = _VAD_MODEL
+            self.vad_model = None
             self.initialized = True
             LOGGER.info("[+] STT Core Ready.")
         except Exception as e:
@@ -89,23 +82,14 @@ class STTService:
             LOGGER.error(f"Transcription error: {e}")
             return ""
 
-    def is_speech(self, audio_np, threshold=0.25):
-        """VAD check to see if a segment contains speech."""
-        if not self.vad_model: self.vad_model = _VAD_MODEL
-        if self.vad_model is None: 
-            # If not initialized yet, we can't reliably detect speech.
-            # Returning False allows the silence_counter to increment,
-            # which will eventually trigger a transcription attempt that will 
-            # return "" until the model is ready. This prevents locking the buffer.
-            return False 
-        
+    def is_speech(self, audio_np, threshold=0.015):
+        """VAD check to see if a segment contains speech using RMS energy thresholding."""
         try:
-            audio_tensor = _TORCH.from_numpy(audio_np).unsqueeze(0)
-            speech_prob = self.vad_model(audio_tensor, 16000).item()
-            
-            if speech_prob > threshold:
+            import numpy as np
+            rms = np.sqrt(np.mean(np.square(audio_np)))
+            if rms > threshold:
                 return True
         except Exception as e:
-            LOGGER.debug(f"VAD calculation error: {e}")
+            LOGGER.debug(f"VAD energy calculation error: {e}")
             return False
         return False

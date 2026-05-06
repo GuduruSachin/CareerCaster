@@ -193,7 +193,7 @@ class GreenRoom(QMainWindow):
         threading.Thread(target=self.prewarm_stt, daemon=True).start()
         
         # Event Handlers
-        self.model_selector.currentTextChanged.connect(self.on_model_changed)
+        self.model_selector.currentIndexChanged.connect(self.on_model_changed_index)
         self.validate_all()
 
     def setup_stylesheet(self):
@@ -254,9 +254,28 @@ class GreenRoom(QMainWindow):
                 background-color: #1A1A1A;
                 border: 1px solid #2A2A2A;
                 border-radius: 8px;
-                padding: 12px 15px;
+                padding-left: 15px;
+                padding-right: 15px;
                 color: #FFFFFF;
                 font-size: 13px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 30px;
+                border-left-width: 1px;
+                border-left-color: #2A2A2A;
+                border-left-style: solid;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+            QComboBox::down-arrow {
+                width: 0px; 
+                height: 0px; 
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #FFFFFF;
+                margin-right: 10px;
             }
             QComboBox:hover { border: 1px solid #3A3A3A; }
             QComboBox QAbstractItemView {
@@ -264,6 +283,13 @@ class GreenRoom(QMainWindow):
                 color: white;
                 selection-background-color: #00E5FF;
                 selection-color: black;
+                border: 1px solid #2A2A2A;
+                padding: 4px;
+                outline: 0px;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 30px;
+                padding-left: 10px;
             }
  
             QProgressBar {
@@ -461,25 +487,20 @@ class GreenRoom(QMainWindow):
                 
                 # 1. Fetch Candidates (Broad Sweep)
                 candidates = [] # list of (short_name, full_name)
+                import requests
                 try:
-                    remote = client.models.list()
-                    for rm in remote:
-                        m_full = rm.name
+                    resp = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}", timeout=10)
+                    resp.raise_for_status()
+                    models_data = resp.json().get("models", [])
+                    for rm in models_data:
+                        m_full = rm.get("name", "")
                         m_short = m_full.split("/")[-1]
-                        
-                        # Accommodate both old and new SDK attribute names
-                        methods = getattr(rm, "supported_generation_methods", [])
-                        if not methods:
-                            methods = getattr(rm, "supported_methods", [])
-                        
-                        is_generative = "generateContent" in methods if methods else True
-                        
-                        # Filter for usable chat models
-                        if is_generative and "gemini" in m_short.lower() and "vision" not in m_short.lower() and "embedding" not in m_short.lower():
+                        methods = rm.get("supportedGenerationMethods", [])
+                        if "generateContent" in methods and "gemini" in m_short.lower() and "vision" not in m_short.lower() and "embedding" not in m_short.lower() and "tts" not in m_short.lower():
                             candidates.append((m_short, m_full))
                 except Exception as e:
-                    LOGGER.error(f"Failed to fetch models: {e}")
-                    raise e # Let the outer try-except handle the failure and show "System Error" or "Empty Discovery"
+                    LOGGER.error(f"Failed to fetch models: {str(e)[:100]}")
+                    raise e
 
                 # 2. Parallel Latency Verification
                 verified_results = [] # list of {"short":, "full":, "lat":}
@@ -496,8 +517,9 @@ class GreenRoom(QMainWindow):
                         lat = int((time.time() - t0) * 1000)
                         with verified_lock:
                             verified_results.append({"short": m_short, "full": m_full, "lat": lat})
-                    except Exception:
-                        pass 
+                    except Exception as e:
+                        err_msg = str(e).split('\n')[0][:80]
+                        LOGGER.warning(f"Ping failed for {m_short}: {err_msg}")
 
                 # Test all retrieved valid models cleanly without prioritizing specific "seed" models.
                 threads = []
@@ -535,7 +557,7 @@ class GreenRoom(QMainWindow):
 
         # self.available_models is a list of {"short":, "full":, "lat":}
         for m in self.available_models:
-            self.model_selector.addItem(m["short"], m["full"])
+            self.model_selector.addItem(f"{m['short']} ({m['lat']}ms)", m["full"])
 
         self.model_selector.setCurrentIndex(0)
         self.model_selector.setEnabled(True)
@@ -554,12 +576,27 @@ class GreenRoom(QMainWindow):
         self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #FF4500; font-weight: bold; font-size: 11px;")
         self.validate_all()
 
+    def on_model_changed_index(self, index):
+        if index < 0: return
+        full_name = self.model_selector.itemData(index)
+        self.on_model_changed(full_name)
+
     def on_model_changed(self, full_name):
         # Triggered by currentTextChanged too? No, I should use currentIndexChanged for data access
         if not full_name: return
         if 'active_model' not in self.session_data: self.session_data['active_model'] = {}
         self.session_data['active_model']['name'] = full_name
         LOGGER.info(f"Command Center: AI Model switched to {full_name}")
+        
+        if hasattr(self, 'available_models') and self.available_models:
+            for m in self.available_models:
+                if m["full"] == full_name:
+                    self.api_latency = m["lat"]
+                    self.status_msg.setText(f"ONLINE: {self.api_latency}ms")
+                    self.status_msg.setStyleSheet("font-family: 'Consolas'; color: #00FF88; font-weight: bold; font-size: 11px;")
+                    self.status_led.setStyleSheet("background-color: #00FF7F; border-radius: 2px;")
+                    break
+        
         self.validate_all()
 
     def populate_devices(self):
