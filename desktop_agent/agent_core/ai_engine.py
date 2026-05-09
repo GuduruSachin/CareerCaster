@@ -144,7 +144,6 @@ class AIWorker(QThread):
             # 5. Stream Duration Monitoring with Retries
             # [API TESTING BYPASS] - Mocking response to save AI tokens while testing STT.
             mock_message = f"**[STT TESTING MODE - AI DISABLED]**\nI heard:\n\"{self.prompt}\"\n\nTell me when you are ready to enable the AI again."
-            import time
             for chunk in mock_message.split(" "):
                 token = chunk + " "
                 full_response += token
@@ -165,7 +164,6 @@ class AIWorker(QThread):
                             self.token_received.emit(token)
                     break # Success! Break out of the retry loop
                 except Exception as stream_err:
-                    import time # ensure time is imported if not already
                     import logging
                     error_msg = str(stream_err)
                     # Check if it is a 503 or transient error

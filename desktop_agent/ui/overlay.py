@@ -55,6 +55,10 @@ class StealthOverlay(QMainWindow):
         self.ai_thread = None
         self.current_response_caution = False # Metadata signal for UI color
         
+        # State for live listening UI
+        self.partial_listen_bubble = None
+        self.partial_listen_label = None
+
         # Conversation Threading: Stores last 4 exchanges (User + Model)
         self.message_history = [] 
 
@@ -163,9 +167,46 @@ class StealthOverlay(QMainWindow):
         self.bridge = CareerBridge(interviewer_idx=itv_id, mic_idx=mic_id)
         self.bridge.status_changed.connect(self.update_bridge_status)
         self.bridge.interviewer_text_detected.connect(self.trigger_ai_from_audio)
+        self.bridge.interviewer_partial_text_detected.connect(self.update_partial_audio)
         self.bridge.start()
 
+    def update_partial_audio(self, partial_text):
+        """Updates the live transcription bubble."""
+        if not self.partial_listen_bubble:
+            # Create a new partial bubble
+            bubble = QFrame()
+            bubble_layout = QVBoxLayout(bubble)
+            bubble_layout.setContentsMargins(15, 10, 15, 10)
+            bubble_layout.setSpacing(5)
+            
+            border_color = "#AAAAAA" # Grayish for partial listening
+            bubble.setStyleSheet(get_bubble_style(border_color))
+            
+            header_label = QLabel("INTERVIEWER (Listening...):")
+            header_label.setStyleSheet(f"color: {border_color}; font-weight: bold; font-size: 10px; font-family: 'Segoe UI'; text-transform: uppercase;")
+            bubble_layout.addWidget(header_label)
+
+            content_label = QLabel(self._process_text(partial_text + " ..."))
+            content_label.setWordWrap(True)
+            content_label.setStyleSheet(CONTENT_LABEL_STYLE)
+            bubble_layout.addWidget(content_label)
+            
+            self.chat_layout.insertWidget(self.chat_layout.count() - 1, bubble)
+            self.partial_listen_bubble = bubble
+            self.partial_listen_label = content_label
+            self.do_scroll_to_bottom()
+        else:
+            self.partial_listen_label.setText(self._process_text(partial_text + " ..."))
+            self.do_scroll_to_bottom()
+
     def inject_message(self, text, sender="SYSTEM", is_new_stream=False):
+        # Clear partial bubble if present
+        if self.partial_listen_bubble:
+            self.chat_layout.removeWidget(self.partial_listen_bubble)
+            self.partial_listen_bubble.deleteLater()
+            self.partial_listen_bubble = None
+            self.partial_listen_label = None
+
         bubble = QFrame()
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(15, 10, 15, 10)
@@ -273,6 +314,14 @@ class StealthOverlay(QMainWindow):
         cv_ctx = self.session_data.get("resume_data", "N/A")
         notes_ctx = self.session_data.get("project_notes", "N/A")
         
+        # We can extract snippets locally quickly in the overlay to show the "Framed Context"
+        from agent_core.context_refiner import extract_snippets
+        framed_cv = extract_snippets(query, cv_ctx)
+        
+        # Provide visual feedback of 'Framed Question' to user
+        if sender == "INTERVIEWER":
+            self.inject_message(f"Focused Context: {framed_cv[:150]}...", sender="SYSTEM")
+
         # Limit history to last 8 turns (4 exchanges)
         relevant_history = self.message_history[-8:]
         
