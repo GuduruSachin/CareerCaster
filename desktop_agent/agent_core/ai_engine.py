@@ -88,6 +88,8 @@ class AIWorker(QThread):
             specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CV SNIPPET] and [PROJECT NOTES]."
         elif persona_mode == "ARCHITECT":
             specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [JD SNIPPET] and [PROJECT NOTES]."
+        elif persona_mode == "DIRECT_TECH":
+            specific_guardrail = "Provide a direct, clear, and concise technical explanation. Compare concepts if asked (e.g., difference between). Explain clearly without overly using buzzwords."
         else:
             specific_guardrail = "Provide a balanced professional response grounded in your experience and supported by [PROJECT NOTES]."
 
@@ -99,13 +101,14 @@ class AIWorker(QThread):
             if is_caution:
                 bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet/Notes]...'"
 
+            contextual_assets = "" if persona_mode == "DIRECT_TECH" else f"Contextual Assets:\n            [PROJECT NOTES]: {self.project_notes}"
+            
             system_instruction = f"""
             Identify as the candidate. Speak ONLY in the first person ('I', 'Me', 'My').
             {bridge_instr}
             {specific_guardrail}
 
-            Contextual Assets:
-            [PROJECT NOTES]: {self.project_notes}
+            {contextual_assets}
 
             Guidelines for a natural, conversational response:
             1. Length: Keep the response concise. Aim for 1-2 short paragraphs that sound like natural spoken language. Do NOT provide overly long "Level 3" essays unless absolutely necessary.
@@ -115,14 +118,21 @@ class AIWorker(QThread):
             """
 
             # Prompt Framing: Modular and snippet-focused
-            refined_prompt = f"""
-            [CV SNIPPET]: {cv_snippet}
-            [JD SNIPPET]: {jd_snippet}
-            
-            INTERVIEWER QUESTION: {self.prompt}
-            
-            Please deliver your response as the candidate:
-            """
+            if persona_mode == "DIRECT_TECH":
+                refined_prompt = f"""
+                INTERVIEWER QUESTION: {self.prompt}
+                
+                Please deliver your response as the candidate:
+                """
+            else:
+                refined_prompt = f"""
+                [CV SNIPPET]: {cv_snippet}
+                [JD SNIPPET]: {jd_snippet}
+                
+                INTERVIEWER QUESTION: {self.prompt}
+                
+                Please deliver your response as the candidate:
+                """
 
             # Audit: Log Refined Parameters
             AUDITOR.info(f"[CONTEXT_ENGINE] - Mode: {persona_mode} | Caution: {is_caution} | History: {len(self.history)}")
@@ -143,13 +153,9 @@ class AIWorker(QThread):
             
             # 5. Stream Duration Monitoring with Retries
             # [API TESTING BYPASS] - Mocking response to save AI tokens while testing STT.
-            mock_message = f"**[STT TESTING MODE - AI DISABLED]**\nI heard:\n\"{self.prompt}\"\n\nTell me when you are ready to enable the AI again."
-            for chunk in mock_message.split(" "):
-                token = chunk + " "
-                full_response += token
-                self.token_received.emit(token)
-                time.sleep(0.05)
-            
+            mock_message = f"**[AI DISABLED FOR TESTING]**\nI am currently operating in test mode to help you verify STT pipeline and UI rendering. Your question was: '{self.prompt}'"
+            self.token_received.emit(mock_message)
+            full_response = mock_message
             '''
             for attempt in range(max_retries):
                 try:

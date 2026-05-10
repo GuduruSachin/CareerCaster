@@ -104,14 +104,22 @@ def detect_intent(query):
         "how do you approach", "what was your role in"
     ]
     
-    # ARCHITECT Mode: Definitions, system design, how-to
+    # DIRECT_TECH Mode: Direct technical questions like "what is difference between", "explain about", definitions
+    direct_tech_triggers = [
+        "difference between", "what is", "how does", "what are",
+        "explain", "define", "compare", "pros and cons of", "vs", "versus"
+    ]
+    
+    # ARCHITECT Mode: System design, high level
     architect_triggers = [
         "architecture", "system design", "scaling", "optimization", "pattern", 
-        "trade-off", "scalability", "how-to", "define", "explain", "why use"
+        "trade-off", "scalability", "how-to", "why use"
     ]
     
     if any(t in q for t in star_triggers):
         return "STAR"
+    if any(t in q for t in direct_tech_triggers):
+        return "DIRECT_TECH"
     if any(t in q for t in architect_triggers):
         return "ARCHITECT"
     

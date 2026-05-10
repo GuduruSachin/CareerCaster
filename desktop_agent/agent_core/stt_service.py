@@ -75,7 +75,7 @@ class STTService:
         if not self.model: return ""
         
         try:
-            segments, info = self.model.transcribe(audio_np, beam_size=5, language="en")
+            segments, info = self.model.transcribe(audio_np, beam_size=1, language="en", condition_on_previous_text=False)
             text = " ".join([s.text for s in segments]).strip()
             return text
         except Exception as e:

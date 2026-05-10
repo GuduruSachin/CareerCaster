@@ -168,6 +168,7 @@ class StealthOverlay(QMainWindow):
         self.bridge.status_changed.connect(self.update_bridge_status)
         self.bridge.interviewer_text_detected.connect(self.trigger_ai_from_audio)
         self.bridge.interviewer_partial_text_detected.connect(self.update_partial_audio)
+        self.bridge.user_text_detected.connect(self.trigger_user_history)
         self.bridge.start()
 
     def update_partial_audio(self, partial_text):
@@ -283,6 +284,17 @@ class StealthOverlay(QMainWindow):
         self.mock_input.setText(text)
         self.start_ai_query(sender="INTERVIEWER")
 
+    def trigger_user_history(self, text):
+        """Callback for bridge detected user text (append to history without AI gen)."""
+        LOGGER.info(f"[OVERLAY] User audio framing completed. User said: {text}")
+        self.inject_message(text, sender="USER")
+        # Add to message history so AI knows what user just said.
+        # The API sees User (Candidate) as "model", and Interviewer as "user".
+        if self.message_history and self.message_history[-1]["role"] == "model":
+            self.message_history[-1]["parts"][0]["text"] += f" {text}"
+        else:
+            self.message_history.append({"role": "model", "parts": [{"text": text}]})
+        
     def start_ai_query(self, sender="USER"):
         query = self.mock_input.text().strip()
         if not query: return
@@ -335,8 +347,11 @@ class StealthOverlay(QMainWindow):
             project_notes=notes_ctx
         )
         self.ai_thread.caution_signal.connect(self.handle_caution_signal)
-        # Update history with User input immediately
-        self.message_history.append({"role": "user", "parts": [{"text": query}]})
+        # Update history with Interviewer input immediately (role='user' for Gemini API)
+        if self.message_history and self.message_history[-1]["role"] == "user":
+            self.message_history[-1]["parts"][0]["text"] += f" \n{query}"
+        else:
+            self.message_history.append({"role": "user", "parts": [{"text": query}]})
         
         self.ai_thread.token_received.connect(self.update_live_response)
         self.ai_thread.finished.connect(self.ai_query_finished)
