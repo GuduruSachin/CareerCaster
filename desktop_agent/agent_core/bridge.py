@@ -128,7 +128,9 @@ class CareerBridge(QObject):
         text = self.stt.transcribe_segment(full_audio)
         # print(f"[*] Transcription Result: '{text}'")
         
-        if len(text) > 5:
+        words = text.strip().split()
+        # Filter out short conversational fillers
+        if len(text) > 5 and len(words) >= 3:
             # print("[+] Triggering AI Response...")
             self.interviewer_text_detected.emit(text)
             self.status_changed.emit("Generating")
@@ -141,6 +143,7 @@ class CareerBridge(QObject):
         text = self.stt.transcribe_segment(full_audio)
         # print(f"[*] User Transcription Result: '{text}'")
         
+        # User side can still pick up everything > 5 chars for logging/history
         if len(text) > 5:
             # For the user, we just emit to append to history, no AI trigger
             self.user_text_detected.emit(text)

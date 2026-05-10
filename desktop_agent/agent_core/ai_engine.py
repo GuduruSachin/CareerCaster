@@ -57,7 +57,7 @@ class AIWorker(QThread):
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, api_key, prompt, history=None, model_name="gemini-3-flash-preview", jd_context="N/A", cv_context="N/A", project_notes="N/A"):
+    def __init__(self, api_key, prompt, history=None, model_name="gemini-3-flash-preview", jd_context="N/A", cv_context="N/A", project_notes="N/A", compiled_persona=""):
         super().__init__()
         self.api_key = api_key
         self.prompt = prompt
@@ -66,6 +66,7 @@ class AIWorker(QThread):
         self.jd_context = jd_context
         self.cv_context = cv_context
         self.project_notes = project_notes
+        self.compiled_persona = compiled_persona
 
     def run(self):
         if not genai:
@@ -80,7 +81,6 @@ class AIWorker(QThread):
         full_response = ""
         
         # 1. DYNAMIC RAG-LITE CONTEXT REFINEMENT
-        jd_snippet = extract_snippets(self.prompt, self.jd_context)
         cv_snippet = extract_snippets(self.prompt, self.cv_context)
         persona_mode = detect_intent(self.prompt)
         is_caution = check_knowledge_gap(self.prompt, self.cv_context)
@@ -92,13 +92,13 @@ class AIWorker(QThread):
         specific_guardrail = ""
         
         if persona_mode == "STAR":
-            specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CV SNIPPET] and [PROJECT NOTES]."
+            specific_guardrail = "Use the Situation-Task-Action-Result (STAR) framework based strictly on projects identified in the [CANDIDATE PERSONA] and [PROJECT NOTES]."
         elif persona_mode == "ARCHITECT":
-            specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [JD SNIPPET] and [PROJECT NOTES]."
+            specific_guardrail = "Focus on technical Trade-offs and Scalability. Benchmark against the [PROJECT NOTES]."
         elif persona_mode == "DIRECT_TECH":
             specific_guardrail = "Provide a direct, clear, and concise technical explanation. Compare concepts if asked (e.g., difference between). Explain clearly without overly using buzzwords."
         else:
-            specific_guardrail = "Provide a balanced professional response grounded in your experience and supported by [PROJECT NOTES]."
+            specific_guardrail = "Provide a balanced professional response grounded in your experience and supported by [CANDIDATE PERSONA] and [PROJECT NOTES]."
 
         try:
             client = genai.Client(api_key=self.api_key)
@@ -106,10 +106,14 @@ class AIWorker(QThread):
             # 4. FIRST-PERSON HUMAN MONOLOGUE GUARDRAILS
             bridge_instr = ""
             if is_caution:
-                bridge_instr = "FORCE BRIDGE: Since the tech is missing from your CV, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Snippet/Notes]...'"
+                bridge_instr = "FORCE BRIDGE: Since the tech is missing from your experience, say: 'I haven't used [Tech] in production yet, but I've done deep work with [Related Tech from Notes/Persona]...'"
 
-            contextual_assets = "" if persona_mode == "DIRECT_TECH" else f"Contextual Assets:\n            [PROJECT NOTES]: {self.project_notes}"
-            
+            contextual_assets = "" 
+            if persona_mode != "DIRECT_TECH":
+                contextual_assets = f"""Contextual Assets:
+[CANDIDATE PERSONA]: {self.compiled_persona}
+[PROJECT NOTES]: {self.project_notes}"""
+
             system_instruction = f"""
             Identify as the candidate. Speak ONLY in the first person ('I', 'Me', 'My').
             {bridge_instr}
@@ -118,7 +122,7 @@ class AIWorker(QThread):
             {contextual_assets}
 
             Guidelines for a natural, conversational response:
-            1. Length: Keep the response concise. Aim for 1-2 short paragraphs that sound like natural spoken language. Do NOT provide overly long "Level 3" essays unless absolutely necessary.
+            1. Length: Give a comprehensive but natural answer to this question as if you are answering in an interview. Ensure you hit the actual points needed to address the interviewer's question instead of aggressively compressing the answer.
             2. Tone: Friendly, professional, and conversational. Use contractions (I've, We're, It's).
             3. Formatting: Do NOT use markdown bolding, italics, or code blocks. The text will be read aloud or quickly scanned on an overlay, so keep it plain text.
             4. Start Immediately: Skip filler phrases. Start your answer directly and naturally.
@@ -129,13 +133,12 @@ class AIWorker(QThread):
                 refined_prompt = f"""
                 INTERVIEWER QUESTION: {self.prompt}
                 
-                Please deliver your response as the candidate:
+                Please deliver your technical response clearly:
                 """
             else:
+                # If it's a general or STAR question, but we want extra context, 
+                # we can still pass a quick snippet of CV to jog memory if persona wasn't enough
                 refined_prompt = f"""
-                [CV SNIPPET]: {cv_snippet}
-                [JD SNIPPET]: {jd_snippet}
-                
                 INTERVIEWER QUESTION: {self.prompt}
                 
                 Please deliver your response as the candidate:

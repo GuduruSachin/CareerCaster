@@ -11,10 +11,21 @@ def extract_query_keywords(query):
     # We use a pattern that looks for alphanumeric clusters and then verify boundaries
     found_keywords = set()
     
+    stop_words = {
+        "tell", "me", "about", "yourself", "what", "is", "the", "difference", "between",
+        "how", "does", "manage", "thank", "you", "know", "can", "describe", "explain",
+        "did", "do", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+        "with", "of", "your", "my", "i", "we", "they", "he", "she", "it", "this", "that",
+        "these", "those", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "not", "no", "yes", "so", "if", "then", "else", "when", "where", "why", "who", "which",
+        "give", "example", "an"
+    }
+    
     # Capture standard alphanumeric words 2+ chars
     alpha_matches = re.findall(r'[a-zA-Z0-9+#]{2,}', query.lower())
     for m in alpha_matches:
-        found_keywords.add(m)
+        if m not in stop_words and len(m) > 2: # Keep 3+ char words to avoid 'is', 'to' just in case
+            found_keywords.add(m)
     
     # Explicitly check whitelist with safer boundary detection
     q_lower = f" {query.lower()} "

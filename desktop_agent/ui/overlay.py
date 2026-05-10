@@ -327,6 +327,7 @@ class StealthOverlay(QMainWindow):
         jd_ctx = self.session_data.get("job_description", "N/A")
         cv_ctx = self.session_data.get("resume_data", "N/A")
         notes_ctx = self.session_data.get("project_notes", "N/A")
+        compiled_persona = self.session_data.get("compiled_persona", "")
         
         # We can extract snippets locally quickly in the overlay to show the "Framed Context"
         from agent_core.context_refiner import extract_snippets
@@ -342,7 +343,8 @@ class StealthOverlay(QMainWindow):
             model_name=self.model_name,
             jd_context=jd_ctx,
             cv_context=cv_ctx,
-            project_notes=notes_ctx
+            project_notes=notes_ctx,
+            compiled_persona=compiled_persona
         )
         self.ai_thread.caution_signal.connect(self.handle_caution_signal)
         # Update history with Interviewer input immediately (role='user' for Gemini API)

@@ -659,9 +659,38 @@ class GreenRoom(QMainWindow):
 
     def finalize_and_start(self):
         # Improved Launch Logic: Don't block UI if pre-warm is already running
-        self.start_btn.setText("LAUNCHING...")
+        self.start_btn.setText("ANALYZING CONTEXT (BOOTING AI)...")
         self.start_btn.setEnabled(False)
-        self.do_launch()
+        threading.Thread(target=self.preprocess_context, daemon=True).start()
+
+    def preprocess_context(self):
+        """Pre-processes CV and JD into a compact persona."""
+        try:
+            if genai and self.api_key:
+                client = genai.Client(api_key=self.api_key)
+                cv_text = self.session_data.get("resume_data", "")
+                jd_text = self.session_data.get("job_description", "")
+                
+                # Only pre-process if we have decent sized text
+                if len(cv_text) > 20:
+                    prompt = f"Analyze the following CV and JD. Provide a concise but comprehensive Candidate Persona summarizing the candidate's matching skills, key projects, and gaps compared to the JD. Also define their core 'voice'. CV: {cv_text}\n\nJD: {jd_text}"
+                    
+                    model_to_use = self.session_data.get("active_model", {}).get("name", "gemini-3-flash-preview")
+                    response = client.models.generate_content(
+                        model=model_to_use,
+                        contents=prompt
+                    )
+                    self.session_data["compiled_persona"] = response.text
+                    LOGGER.info("Successfully compiled candidate persona.")
+                else:
+                    self.session_data["compiled_persona"] = "No substantial CV/JD provided."
+            else:
+                self.session_data["compiled_persona"] = "AI not initialized for pre-processing."
+        except Exception as e:
+            LOGGER.error(f"Preprocessing failed: {e}")
+            self.session_data["compiled_persona"] = "Error building persona. Proceeding with standard mode."
+        
+        QTimer.singleShot(0, self.do_launch)
 
     def do_launch(self):
 
