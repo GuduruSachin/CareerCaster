@@ -502,35 +502,28 @@ class GreenRoom(QMainWindow):
                     LOGGER.error(f"Failed to fetch models: {str(e)[:100]}")
                     raise e
 
-                # 2. Parallel Latency Verification
-                verified_results = [] # list of {"short":, "full":, "lat":}
-                verified_lock = threading.Lock()
-                
-                def ping_model(m_short, m_full):
-                    try:
-                        t0 = time.time()
-                        client.models.generate_content(
-                            model=m_full, 
-                            contents="ping", 
-                            config={"max_output_tokens": 1}
-                        )
-                        lat = int((time.time() - t0) * 1000)
-                        with verified_lock:
-                            verified_results.append({"short": m_short, "full": m_full, "lat": lat})
-                    except Exception as e:
-                        err_msg = str(e).split('\n')[0][:80]
-                        LOGGER.warning(f"Ping failed for {m_short}: {err_msg}")
+                # 2. Check general API latency using a fast model
+                verified_results = []
+                api_latency = 0
+                try:
+                    # Ping just one fast, typical model to verify connectivity and measure latency
+                    for default_m in ["gemini-3.1-flash-preview", "gemini-2.5-flash", "gemini-3-flash-preview"]:
+                        test_model = next((f for s, f in candidates if s == default_m), None)
+                        if test_model:
+                            t0 = time.time()
+                            client.models.generate_content(
+                                model=test_model, 
+                                contents="ping", 
+                                config={"max_output_tokens": 1}
+                            )
+                            api_latency = int((time.time() - t0) * 1000)
+                            break
+                except Exception as e:
+                    LOGGER.warning(f"Initial API latency ping failed: {str(e)[:80]}")
 
-                # Test all retrieved valid models cleanly without prioritizing specific "seed" models.
-                threads = []
+                # Populate all models without pinging each one individually to save quota
                 for m_short, m_full in candidates:
-                    t = threading.Thread(target=ping_model, args=(m_short, m_full))
-                    t.daemon = True
-                    t.start()
-                    threads.append(t)
-                
-                # Wait for verification (max 2 seconds)
-                for t in threads: t.join(timeout=2.0)
+                    verified_results.append({"short": m_short, "full": m_full, "lat": api_latency})
                 
                 if verified_results:
                     # Sort by latency DESC as per user request (high latency first)

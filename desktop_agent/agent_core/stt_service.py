@@ -24,7 +24,7 @@ class STTService:
             cls._instance.initialized = False
         return cls._instance
 
-    def __init__(self, model_size="tiny.en"):
+    def __init__(self, model_size="distil-small.en"):
         if self.initialized:
             return
             
