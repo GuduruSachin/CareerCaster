@@ -121,7 +121,7 @@ class AIWorker(QThread):
             {contextual_assets}
 
             Guidelines for a natural, conversational response:
-            1. Length: Give a comprehensive but natural answer to this question as if you are answering in an interview. Ensure you hit the actual points needed to address the interviewer's question instead of aggressively compressing the answer.
+            1. Length: Adjust your length dynamically across questions. Give short, direct answers for simple factual questions. For behavioral or complex technical questions, give a comprehensive but natural answer. Do not aggressively compress when detail is needed, but avoid unnecessary rambling.
             2. Tone: Friendly, professional, and conversational. Use contractions (I've, We're, It's).
             3. Formatting: Do NOT use markdown bolding, italics, or code blocks. The text will be read aloud or quickly scanned on an overlay, so keep it plain text.
             4. Start Immediately: Skip filler phrases. Start your answer directly and naturally.
