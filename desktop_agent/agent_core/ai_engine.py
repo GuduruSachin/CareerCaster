@@ -12,6 +12,7 @@ except ImportError:
     types = None
 
 from core.paths import get_logs_dir
+import sys
 from .context_refiner import extract_snippets, detect_intent, check_knowledge_gap
 
 LOGGER = logging.getLogger("CareerCaster")
@@ -24,17 +25,21 @@ def setup_ai_auditor():
     logs_dir = get_logs_dir()
     log_file = os.path.join(logs_dir, "ai_transactions.log")
     
-    # Format: YYYY-MM-DD HH:MM:SS,mmm - [DIRECTION] - MessageContent
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    # We use a clean format without timestamps for console/audit to match user preference
+    formatter = logging.Formatter('%(message)s')
     
     fh = logging.FileHandler(log_file)
     fh.setFormatter(formatter)
+    
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(formatter)
     
     # Remove existing handlers if re-initialized
     if auditor.hasHandlers():
         auditor.handlers.clear()
         
     auditor.addHandler(fh)
+    auditor.addHandler(sh)
     auditor.propagate = False # Prevent leaking to main app logger
     return auditor
 
@@ -45,6 +50,8 @@ class AIWorker(QThread):
     CareerCaster v1.2 - RE-ENGINEERED AI Engine.
     Handles dynamic persona pivoting and human-centric monologue generation.
     """
+    question_count = 0
+
     token_received = pyqtSignal(str)
     caution_signal = pyqtSignal(bool)
     finished = pyqtSignal()
@@ -135,8 +142,12 @@ class AIWorker(QThread):
                 """
 
             # Audit: Log Refined Parameters
-            AUDITOR.info(f"[CONTEXT_ENGINE] - Mode: {persona_mode} | Caution: {is_caution} | History: {len(self.history)}")
-            AUDITOR.info(f"[SENT_TO_AI] - System Instruction: {system_instruction.strip()}")
+            AIWorker.question_count += 1
+            AUDITOR.info("\n" + "="*50)
+            AUDITOR.info(f"Question {AIWorker.question_count}\n")
+            AUDITOR.info(f"1) TEXT HEARD (VOICE TO TEXT): {self.prompt}")
+            AUDITOR.info(f"2) FRAMED QUESTION: {self.prompt}")
+            AUDITOR.info(f"3) PROMPT SENDING TO AI:\nSystem Instruction:\n{system_instruction.strip()}\n\nRefined Prompt:\n{refined_prompt.strip()}")
 
             # Prepare messages with history
             messages = self.history + [{"role": "user", "parts": [{"text": refined_prompt.strip()}]}]
@@ -152,11 +163,7 @@ class AIWorker(QThread):
             base_delay = 1 # second
             
             # 5. Stream Duration Monitoring with Retries
-            # [API TESTING BYPASS] - Mocking response to save AI tokens while testing STT.
-            mock_message = f"**[AI DISABLED FOR TESTING]**\nI am currently operating in test mode to help you verify STT pipeline and UI rendering. Your question was: '{self.prompt}'"
-            self.token_received.emit(mock_message)
-            full_response = mock_message
-            '''
+            full_response = ""
             for attempt in range(max_retries):
                 try:
                     for chunk in client.models.generate_content_stream(
@@ -172,6 +179,12 @@ class AIWorker(QThread):
                 except Exception as stream_err:
                     import logging
                     error_msg = str(stream_err)
+                    
+                    # Intercept 429 Resource Exhausted cleanly
+                    if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "quota" in error_msg.lower():
+                        self.token_received.emit("\n\n**[API QUOTA EXCEEDED]**\nThe selected Gemini model is out of tokens or hitting a rate limit. Please select a different model in the Control Panel or wait a few minutes.")
+                        return
+
                     # Check if it is a 503 or transient error
                     if "503" in error_msg or "UNAVAILABLE" in error_msg or "temporarily" in error_msg.lower():
                         if attempt < max_retries - 1:
@@ -181,12 +194,12 @@ class AIWorker(QThread):
                             continue
                     # Default: reraise if we can't handle it or exhausted retries
                     raise stream_err
-            '''
             
             # Audit: Final Metrics
             duration = time.time() - start_time
-            AUDITOR.info(f"[RECEIVED_FROM_AI] - Full Response: {full_response}")
+            AUDITOR.info(f"4) ANSWER RECEIVED FROM AI: {full_response}")
             AUDITOR.info(f"[METRICS] - Duration: {duration:.2f}s | Mode: {persona_mode} | Caution: {is_caution}")
+            AUDITOR.info("="*50 + "\n")
 
             self.finished.emit()
         except Exception as e:

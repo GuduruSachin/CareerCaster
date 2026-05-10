@@ -48,18 +48,20 @@ MAIN_WINDOW_STYLE = """
 def get_bubble_style(border_color):
     return f"""
         QFrame {{
-            background-color: #1E1E1E;
-            border-radius: 12px;
-            border-left: 3px solid {border_color};
+            background-color: #1A1A1A;
+            border-radius: 8px;
+            border: 1px solid #2A2A2A;
+            border-left: 4px solid {border_color};
+            margin-bottom: 5px;
         }}
     """
 
 CONTENT_LABEL_STYLE = """
     QLabel {
-        color: #E0E0E0; 
-        font-size: 15px; 
+        color: #F0F0F0; 
+        font-size: 16px; 
         font-family: 'Segoe UI', sans-serif; 
-        line-height: 160%; 
+        line-height: 1.6; 
         background: transparent; 
         border: none;
     }

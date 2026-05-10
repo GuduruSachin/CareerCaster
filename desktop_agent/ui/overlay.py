@@ -177,8 +177,8 @@ class StealthOverlay(QMainWindow):
             # Create a new partial bubble
             bubble = QFrame()
             bubble_layout = QVBoxLayout(bubble)
-            bubble_layout.setContentsMargins(15, 10, 15, 10)
-            bubble_layout.setSpacing(5)
+            bubble_layout.setContentsMargins(15, 15, 15, 15)
+            bubble_layout.setSpacing(8)
             
             border_color = "#AAAAAA" # Grayish for partial listening
             bubble.setStyleSheet(get_bubble_style(border_color))
@@ -210,10 +210,18 @@ class StealthOverlay(QMainWindow):
 
         bubble = QFrame()
         bubble_layout = QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(15, 10, 15, 10)
-        bubble_layout.setSpacing(5)
+        bubble_layout.setContentsMargins(15, 15, 15, 15)
+        bubble_layout.setSpacing(8)
         
-        border_color = "#00FFFF" if sender == "ENGINE" else ("#FFAA00" if sender == "SYSTEM" else "#FFFFFF")
+        if sender == "ENGINE":
+            border_color = "#00E5FF" # Cyan for Candidate/Engine
+        elif sender == "INTERVIEWER":
+            border_color = "#B388FF" # Purple for Interviewer
+        elif sender == "SYSTEM":
+            border_color = "#FFAA00" # Orange for System
+        else:
+            border_color = "#FFFFFF"
+            
         bubble.setStyleSheet(get_bubble_style(border_color))
         
         header_label = QLabel(f"{sender}:")
@@ -280,14 +288,13 @@ class StealthOverlay(QMainWindow):
 
     def trigger_ai_from_audio(self, text):
         """Callback for bridge detected interviewer text."""
-        LOGGER.info(f"[OVERLAY] Audio framing completed. Raw text detected: {text}")
+        # LOGGER.info(f"[OVERLAY] Audio framing completed. Raw text detected: {text}")
         self.mock_input.setText(text)
         self.start_ai_query(sender="INTERVIEWER")
 
     def trigger_user_history(self, text):
         """Callback for bridge detected user text (append to history without AI gen)."""
-        LOGGER.info(f"[OVERLAY] User audio framing completed. User said: {text}")
-        self.inject_message(text, sender="USER")
+        # LOGGER.info(f"[OVERLAY] User audio framing completed. User said: {text}")
         # Add to message history so AI knows what user just said.
         # The API sees User (Candidate) as "model", and Interviewer as "user".
         if self.message_history and self.message_history[-1]["role"] == "model":
@@ -300,14 +307,9 @@ class StealthOverlay(QMainWindow):
         if not query: return
         
         self.mock_input.clear()
-        LOGGER.info(f"[OVERLAY] Sending framed question to AI Engine: {query}")
+        # LOGGER.info(f"[OVERLAY] Sending framed question to AI Engine: {query}")
         self.inject_message(query, sender=sender)
         
-        # Requirement 1: Only mock if Preview Mode is explicitly True
-        if self.preview_mode_active:
-            self.inject_message("PREVIEW MODE: (AI Query Mocked) " + query, sender="SYSTEM")
-            return
-
         # LIVE ENGINE TRIGGER
         if not self.api_key:
             self.handle_ai_error("API Key missing. Please check dashboard session.")
@@ -330,10 +332,6 @@ class StealthOverlay(QMainWindow):
         from agent_core.context_refiner import extract_snippets
         framed_cv = extract_snippets(query, cv_ctx)
         
-        # Provide visual feedback of 'Framed Question' to user
-        if sender == "INTERVIEWER":
-            self.inject_message(f"Focused Context: {framed_cv[:150]}...", sender="SYSTEM")
-
         # Limit history to last 8 turns (4 exchanges)
         relevant_history = self.message_history[-8:]
         

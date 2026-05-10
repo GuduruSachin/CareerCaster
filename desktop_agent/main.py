@@ -60,7 +60,7 @@ def setup_logging():
     log_file = os.path.join(logs_dir, "session.log")
     
     LOGGER = logging.getLogger("CareerCaster")
-    LOGGER.setLevel(logging.INFO)
+    LOGGER.setLevel(logging.WARNING)
     
     formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - %(message)s')
     
