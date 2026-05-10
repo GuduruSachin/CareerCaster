@@ -34,7 +34,8 @@ class CareerBridge(QObject):
         self.interviewer_speech_active = False
         self.user_speech_active = False
         
-        self.SILENCE_THRESHOLD_MS = 2500 # Wait for 2.5s pause to ensure question is complete
+        # Reduced silence threshold for significantly faster AI response trigger
+        self.SILENCE_THRESHOLD_MS = 1200 # Wait for 1.2s pause (down from 2.5s) to assume completion
         self.CHUNK_DURATION_MS = 64 # based on 1024 chunk / 16000 hz
         self.last_partial_time = 0
         self._partial_lock = threading.Lock()
@@ -66,7 +67,8 @@ class CareerBridge(QObject):
                 
                 # Periodic partial transcription for live UI feedback
                 current_time = time.time()
-                if self.interviewer_speech_active and current_time - self.last_partial_time > 1.5 and len(self.interviewer_buffer) > 15:
+                # Run partials faster (every 1.0s) so it feels much snappier 
+                if self.interviewer_speech_active and current_time - self.last_partial_time > 1.0 and len(self.interviewer_buffer) > 10:
                     self.last_partial_time = current_time
                     threading.Thread(target=self._handle_partial_segment, args=(list(self.interviewer_buffer),), daemon=True).start()
 

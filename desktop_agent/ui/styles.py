@@ -45,32 +45,34 @@ MAIN_WINDOW_STYLE = """
     }
 """
 
-def get_bubble_style(border_color):
+def get_bubble_style(border_color, is_caution=False):
+    # Dark modern backgrounds, slight tint for caution
+    bg_color = "rgba(45, 25, 5, 0.8)" if is_caution else "rgba(25, 25, 25, 0.75)"
     return f"""
         QFrame {{
-            background-color: #1A1A1A;
-            border-radius: 8px;
-            border: 1px solid #2A2A2A;
+            background-color: {bg_color};
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-left: 4px solid {border_color};
-            margin-bottom: 5px;
+            margin-bottom: 6px;
         }}
     """
 
 CONTENT_LABEL_STYLE = """
     QLabel {
-        color: #F0F0F0; 
-        font-size: 16px; 
-        font-family: 'Segoe UI', sans-serif; 
-        line-height: 1.6; 
+        color: #E8E8E8; 
+        font-size: 15px; 
+        font-family: 'Segoe UI', system-ui, sans-serif; 
+        line-height: 1.5; 
         background: transparent; 
         border: none;
     }
 """
 
 STATUS_BAR_STYLE = "background-color: #0A0A0A; border-top: 1px solid #1A1A1A;"
-READY_STYLE = "color: #00FF00; font-family: 'Consolas', monospace; font-size: 10px;"
-THINKING_STYLE = "color: #FFAA00; font-family: 'Consolas', monospace; font-size: 10px;"
-ERROR_STYLE = "color: #FF0000; font-family: 'Consolas', monospace; font-size: 10px;"
-AI_LABEL_STYLE = "color: #00FFFF; font-size: 10px; font-weight: bold; font-family: 'Segoe UI';"
+READY_STYLE = "color: #00E676; font-family: 'Consolas', monospace; font-size: 10px;"
+THINKING_STYLE = "color: #FFB042; font-family: 'Consolas', monospace; font-size: 10px;"
+ERROR_STYLE = "color: #FF5252; font-family: 'Consolas', monospace; font-size: 10px;"
+AI_LABEL_STYLE = "color: #00D4FF; font-size: 10px; font-weight: bold; font-family: 'Segoe UI';"
 HEADER_TITLE_STYLE = "color: #FFFFFF; font-weight: bold; font-size: 14px; font-family: 'Segoe UI';"
-HEADER_SESSION_STYLE = "color: #666666; font-size: 11px; font-family: 'Segoe UI';"
+HEADER_SESSION_STYLE = "color: #888888; font-size: 11px; font-family: 'Segoe UI';"

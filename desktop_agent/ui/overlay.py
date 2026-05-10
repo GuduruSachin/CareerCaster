@@ -214,13 +214,13 @@ class StealthOverlay(QMainWindow):
         bubble_layout.setSpacing(8)
         
         if sender == "ENGINE":
-            border_color = "#00E5FF" # Cyan for Candidate/Engine
+            border_color = "#00D4FF" # Cyan for Candidate/Engine
         elif sender == "INTERVIEWER":
-            border_color = "#B388FF" # Purple for Interviewer
+            border_color = "#A378FF" # Purple for Interviewer
         elif sender == "SYSTEM":
-            border_color = "#FFAA00" # Orange for System
+            border_color = "#F5A623" # Orange for System
         else:
-            border_color = "#FFFFFF"
+            border_color = "#E0E0E0"
             
         bubble.setStyleSheet(get_bubble_style(border_color))
         
@@ -270,7 +270,7 @@ class StealthOverlay(QMainWindow):
         # 2. MARKDOWN ACCENTS: Syntax highlighting for technical terms
         processed = re.sub(r'\*\*(.*?)\*\*', r'<b style="color: #FFFFFF;">\1</b>', text) # Parse bold
         processed = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed)          # Parse single italics
-        processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; font-weight: bold; background-color: rgba(0, 255, 255, 0.1); color: #00E5FF; padding: 1px 4px; border-radius: 4px;">\1</span>', processed)
+        processed = re.sub(r'`([^`]+)`', r'<span style="font-family: Consolas; font-weight: bold; background-color: rgba(77, 208, 225, 0.15); color: #4DD0E1; padding: 1px 4px; border-radius: 4px;">\1</span>', processed)
         return processed
 
     def update_bridge_status(self, status):
@@ -329,10 +329,6 @@ class StealthOverlay(QMainWindow):
         notes_ctx = self.session_data.get("project_notes", "N/A")
         compiled_persona = self.session_data.get("compiled_persona", "")
         
-        # We can extract snippets locally quickly in the overlay to show the "Framed Context"
-        from agent_core.context_refiner import extract_snippets
-        framed_cv = extract_snippets(query, cv_ctx)
-        
         # Limit history to last 8 turns (4 exchanges)
         relevant_history = self.message_history[-8:]
         
@@ -365,13 +361,7 @@ class StealthOverlay(QMainWindow):
         """
         self.current_response_caution = is_active
         if is_active and self.current_response_bubble:
-            self.current_response_bubble.setStyleSheet("""
-                QFrame {
-                    background-color: rgba(204, 102, 0, 0.85);
-                    border-radius: 12px;
-                    border-left: 3px solid #FFAA00;
-                }
-            """)
+            self.current_response_bubble.setStyleSheet(get_bubble_style("#FFB042", is_caution=True))
 
     def update_live_response(self, token):
         self.current_response_text += token

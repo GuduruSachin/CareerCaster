@@ -81,7 +81,6 @@ class AIWorker(QThread):
         full_response = ""
         
         # 1. DYNAMIC RAG-LITE CONTEXT REFINEMENT
-        cv_snippet = extract_snippets(self.prompt, self.cv_context)
         persona_mode = detect_intent(self.prompt)
         is_caution = check_knowledge_gap(self.prompt, self.cv_context)
         
